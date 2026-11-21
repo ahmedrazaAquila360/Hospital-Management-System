@@ -1,0 +1,36 @@
+dentition-bp3d.glb — 3D dentition used by the DentalHub dental chart
+
+This file is a modified version of BodyParts3D data:
+
+  BodyParts3D, Copyright© The Database Center for Life Science licensed by
+  CC Attribution-Share Alike 2.1 Japan
+  https://dbarchive.biosciencedbc.jp/en/bodyparts3d/
+  Release 3.0 (2011-09-15), OBJ files with 95% polygon reduction.
+  Meshes used: 28 permanent teeth (FMA55680–55706, FMA55798–55799, FMA57140–57143),
+  mandible (FMA52748), right and left maxilla (FMA53649, FMA53650),
+  gingiva of upper and lower jaw (FMA59763, FMA59764).
+
+Changes made by DentalHub (scripts/build-bodyparts3d-dentition.mts):
+  - converted to glTF binary, re-oriented to the chart's axes and recentred;
+  - occlusal plane levelled (the source head pose tilts it ~11°);
+  - mandible, lower teeth and lower gingiva rotated about the condyles to open
+    the mouth for inspection (~20mm between the incisal edges);
+  - gingiva extended over the alveolar ridges (the ridge part of each jaw, slightly
+    thickened) and its margin moved to each tooth's cemento-enamel junction;
+  - maxilla cropped a few millimetres above the root apices;
+  - each tooth placed in its own frame, named by FDI number (tooth_11 … tooth_48)
+    and split at the cemento-enamel junction into crown and root meshes;
+  - meshes simplified (≈119k triangles in total), quantized and Meshopt-compressed;
+  - natural enamel, cementum, gingiva and bone shading baked into vertex colours;
+  - third molars (18, 28, 38, 48) added from DentalHub's schematic model, because
+    BodyParts3D does not include them. They are marked "schematic" in the file.
+
+The still images in public/models/fallback/ (shown on devices without usable 3D
+graphics) are renders of this model and are covered by the same licence and credit.
+
+License of this file: Creative Commons Attribution-ShareAlike 2.1 Japan
+(https://creativecommons.org/licenses/by-sa/2.1/jp/deed.en), the licence of the
+original data. You may copy, modify and redistribute it under the same terms,
+crediting BodyParts3D as above.
+
+This licence covers this model file and its renders only, not the DentalHub application.

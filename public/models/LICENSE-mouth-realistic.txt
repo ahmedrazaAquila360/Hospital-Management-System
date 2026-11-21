@@ -1,0 +1,27 @@
+mouth-realistic.glb — "Realistic mouth" model used by the DentalHub dental chart
+
+This file is a modified version of:
+
+  "Human teeth" by Alexander Antipov (Sketchfab: @Dessen)
+  https://sketchfab.com/3d-models/human-teeth-c4c569f0e08948e2a572007a7a5726f2
+  Licensed under Creative Commons Attribution 4.0 International (CC BY 4.0)
+  https://creativecommons.org/licenses/by/4.0/
+  Source file: Sketchfab's GLB download with 2k textures.
+
+Changes made by DentalHub (scripts/build-realistic-mouth.mts):
+  - scaled to millimetres and recentred on the chart's axes;
+  - occlusal plane levelled;
+  - the 32 crowns separated, each placed in its own frame and named by FDI number
+    (tooth_11 … tooth_48);
+  - the gum, palate and tongue surface split into upper and lower parts, and the lower
+    part, with the lower teeth, rotated to open the mouth (~14mm between incisal edges);
+  - gum depth below each crown recorded in the tooth nodes (used to size implant posts);
+  - materials converted from specular-glossiness to metallic-roughness, with a clear
+    coat; textures re-encoded as JPEG; meshes quantized and Meshopt-compressed.
+
+The model has crowns only: no roots, pulp, nerves or jaw bone.
+
+License of this file: CC BY 4.0, the licence of the original. The credit above is shown
+in the dental chart whenever this model is displayed.
+
+This licence covers this model file only, not the DentalHub application.

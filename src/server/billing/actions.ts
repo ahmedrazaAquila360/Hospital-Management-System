@@ -1,0 +1,191 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { prisma } from "@/lib/prisma";
+import { requireUser } from "@/lib/auth/guard";
+import { invoiceSchema, paymentSchema } from "@/lib/validations/invoice";
+import { generateInvoiceNumber } from "@/server/billing/queries";
+import { formatCurrency, toNumber } from "@/lib/format";
+import { can } from "@/lib/permissions";
+
+export type InvoiceFormState = { error?: string };
+export type PaymentFormState = { error?: string; success?: boolean };
+
+function money(n: number) {
+  return n.toFixed(2);
+}
+
+export async function createInvoiceAction(_prev: InvoiceFormState, formData: FormData): Promise<InvoiceFormState> {
+  const user = await requireUser();
+  // The New Invoice page is only reachable with billing.manage; enforce it here too.
+  if (!can(user, "billing.create")) return { error: "You don't have permission to create invoices." };
+
+  const descriptions = formData.getAll("itemDescription") as string[];
+  const quantities = formData.getAll("itemQuantity") as string[];
+  const unitPrices = formData.getAll("itemUnitPrice") as string[];
+  const treatmentIds = formData.getAll("itemTreatmentId") as string[];
+
+  const items = descriptions
+    .map((description, i) => ({
+      description,
+      quantity: Number(quantities[i] ?? 1),
+      unitPrice: Number(unitPrices[i] ?? 0),
+      treatmentId: treatmentIds[i] || undefined,
+    }))
+    .filter((item) => item.description.trim().length > 0);
+
+  const parsed = invoiceSchema.safeParse({
+    patientId: formData.get("patientId"),
+    dentistId: formData.get("dentistId") || undefined,
+    discount: formData.get("discount") || 0,
+    tax: formData.get("tax") || 0,
+    notes: formData.get("notes") ?? "",
+    items,
+  });
+
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Please fix the highlighted fields." };
+  const data = parsed.data;
+
+  const subtotal = data.items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
+  if (data.discount && !can(user,"billing.discount")) return { error: "Discount authorization required." };
+  if (data.discount > subtotal) return { error: "Discount exceeds the subtotal." };
+  const total = Math.max(0, subtotal - data.discount + data.tax);
+  const invoiceNumber = await generateInvoiceNumber();
+
+  const invoice = await prisma.invoice.create({
+    data: {
+      invoiceNumber,
+      patientId: data.patientId,
+      dentistId: data.dentistId || null,
+      subtotal: money(subtotal),
+      discount: money(data.discount),
+      tax: money(data.tax),
+      total: money(total),
+      status: "UNPAID",
+      notes: data.notes || null,
+      createdById: user.id,
+      items: {
+        create: data.items.map((item) => ({
+          description: item.description,
+          quantity: item.quantity,
+          unitPrice: money(item.unitPrice),
+          amount: money(item.quantity * item.unitPrice),
+          treatmentId: item.treatmentId || null,
+        })),
+      },
+    },
+    include: { patient: true },
+  });
+
+  await prisma.activityLog.create({
+    data: {
+      userId: user.id,
+      action: "CREATE",
+      entityType: "Invoice",
+      entityId: invoice.id,
+      description: `${user.name} created invoice ${invoice.invoiceNumber} for ${invoice.patient.fullName}.`,
+    },
+  });
+
+  revalidatePath("/billing/invoices");
+  revalidatePath(`/patients/${data.patientId}`);
+  redirect(`/billing/invoices/${invoice.id}`);
+}
+
+export async function recordPaymentAction(_prev: PaymentFormState, formData: FormData): Promise<PaymentFormState> {
+  const user = await requireUser();
+  if (!can(user, "billing.payments")) return { error: "You don't have permission to record payments." };
+
+  const parsed = paymentSchema.safeParse({
+    invoiceId: formData.get("invoiceId"),
+    amount: formData.get("amount"),
+    method: formData.get("method"),
+    reference: formData.get("reference") ?? "",
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Please fix the highlighted fields." };
+  const data = parsed.data;
+
+  const result = await prisma.$transaction(async tx => {
+    await tx.$queryRaw`SELECT id FROM "Invoice" WHERE id = ${data.invoiceId} FOR UPDATE`;
+    const invoice = await tx.invoice.findUnique({
+      where: { id: data.invoiceId },
+      include: { payments: true, patient: true },
+    });
+    if (!invoice) return { error: "Invoice not found." };
+
+    const alreadyPaid = invoice.payments.reduce((sum, p) => sum + toNumber(p.amount), 0);
+    const remaining = toNumber(invoice.total) - alreadyPaid;
+    if (Math.round(data.amount * 100) > Math.round(remaining * 100)) {
+      return { error: `Amount exceeds the remaining balance of $${remaining.toFixed(2)}.` };
+    }
+
+    await tx.payment.create({
+      data: {
+        invoiceId: data.invoiceId,
+        patientId: invoice.patientId,
+        amount: money(data.amount),
+        method: data.method,
+        reference: data.reference || null,
+        receivedById: user.id,
+      },
+    });
+
+    const newPaid = alreadyPaid + data.amount;
+    const newStatus = Math.round(newPaid * 100) >= Math.round(toNumber(invoice.total) * 100) ? "PAID" : newPaid > 0 ? "PARTIALLY_PAID" : "UNPAID";
+
+    await tx.invoice.update({ where: { id: data.invoiceId }, data: { status: newStatus } });
+
+    await tx.notification.create({
+      data: {
+        userId: invoice.createdById ?? user.id,
+        type: "PAYMENT_RECEIVED",
+        title: "Payment received",
+        message: `${formatCurrency(data.amount)} received from ${invoice.patient.fullName} for ${invoice.invoiceNumber}.`,
+        link: `/billing/invoices/${invoice.id}`,
+      },
+    });
+
+    await tx.activityLog.create({
+      data: {
+        userId: user.id,
+        action: "PAYMENT",
+        entityType: "Invoice",
+        entityId: invoice.id,
+        description: `${user.name} recorded a ${formatCurrency(data.amount)} payment for ${invoice.invoiceNumber}.`,
+      },
+    });
+    return { invoice };
+  });
+  if (!result.invoice) return { error: result.error };
+  const { invoice } = result;
+
+  revalidatePath("/billing/invoices");
+  revalidatePath(`/billing/invoices/${invoice.id}`);
+  revalidatePath("/billing/payments");
+  revalidatePath(`/patients/${invoice.patientId}`);
+  revalidatePath("/dashboard");
+
+  return { success: true };
+}
+
+export async function refundPayment(form: FormData) {
+  const actor = await requireUser();
+  if (!can(actor,"billing.refund")) throw new Error("Refund permission required.");
+  const id = String(form.get("invoiceId") ?? "");
+  const reason = String(form.get("reason") ?? "").trim();
+  const amount = String(form.get("amount") ?? "");
+  const method = paymentSchema.shape.method.parse(form.get("method"));
+  if (!reason || reason.length > 250 || !/^\d{1,8}(\.\d{1,2})?$/.test(amount) || Number(amount) <= 0) throw new Error("Enter a refund amount and reason.");
+  await prisma.$transaction(async tx => {
+    await tx.$queryRaw`SELECT id FROM "Invoice" WHERE id = ${id} FOR UPDATE`;
+    const invoice = await tx.invoice.findUniqueOrThrow({ where: { id }, include: { payments: true } });
+    const netCents = invoice.payments.reduce((s,p) => s + Math.round(p.amount.toNumber()*100),0) - Math.round(Number(amount)*100);
+    if (netCents < 0) throw new Error("Refund exceeds net payments.");
+    const refund = await tx.payment.create({ data: { invoiceId: id, patientId: invoice.patientId, method, amount: -Number(amount), reference: reason, receivedById: actor.id } });
+    await tx.invoice.update({ where: { id }, data: { status: netCents >= Math.round(invoice.total.toNumber()*100) ? "PAID" : netCents ? "PARTIALLY_PAID" : "UNPAID" } });
+    await tx.activityLog.create({ data: { userId: actor.id, entityType: "Payment", entityId: refund.id, action: "REFUND", description: reason } });
+  });
+  revalidatePath("/billing/invoices/" + id);
+  revalidatePath("/billing/payments");
+}

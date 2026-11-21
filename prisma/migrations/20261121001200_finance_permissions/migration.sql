@@ -1,0 +1,2 @@
+INSERT INTO "Permission" (id,key,label,module) VALUES ('hospital-refund','billing.refund','Refund payments','billing'),('hospital-discount','billing.discount','Discount invoices','billing') ON CONFLICT (key) DO NOTHING;
+INSERT INTO "RolePermission" (id,"roleId","permissionId") SELECT md5(r.id || p.id),r.id,p.id FROM "Role" r CROSS JOIN "Permission" p WHERE r.name IN ('ADMIN','BILLING_OFFICER') AND p.key IN ('billing.refund','billing.discount') ON CONFLICT ("roleId","permissionId") DO NOTHING;
