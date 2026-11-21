@@ -64,3 +64,5 @@ The final admission reservation, deposit settlement, signed amendment and concur
 Local development uses database hospital_management_mvp. Staff login credentials use HOSPITAL_DEMO_PASSWORD in the local .env file. The seed uses synthetic accounts only. The retained DENTIST database role is displayed as Doctor.
 
 Bed charging uses hospital calendar nights, with one day charged for an admission and discharge on the same calendar day. A transfer retains each bed's rate at allocation time. This billing convention is an implementation assumption for hospital review.
+
+Discharge report verification passed through the browser. An authorized administrator opened a completed synthetic admission's printable summary and saw the saved discharge instructions. An anonymous request to the same report redirected to login. The admission register now links completed admissions to this report. TypeScript and targeted lint checks passed.

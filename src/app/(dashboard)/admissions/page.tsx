@@ -158,6 +158,7 @@ export default async function Admissions() {
                 {a.diagnosis} · {a.status.toLowerCase().replaceAll("_", " ")}
               </p>
               <p>{a.summary}</p>
+              {a.status === "DISCHARGED" && <Link className="text-brand underline" href={`/admissions/${a.id}/print`}>Print discharge summary</Link>}
               {a.encounter && can(user, "opd.view") && (
                 <Link href={`/opd?visit=${a.encounter.id}`}>Clinical workspace</Link>
               )}
