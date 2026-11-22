@@ -1,5 +1,6 @@
 import "server-only";
 import { patientScope } from "./access";
+import { can } from "@/lib/permissions";
 import { requireUser } from "@/lib/auth/guard";
 import { prisma } from "@/lib/prisma";
 import { DEFAULT_PAGE_SIZE } from "@/lib/pagination";
@@ -109,11 +110,11 @@ export async function getPatientById(id: string) {
       createdBy: true,
       medicalHistory: true,
       dentalRecord: { include: { teeth: { where: { toothNumber: { lte: 48 } }, orderBy: { toothNumber: "asc" }, include: { conditions: { orderBy: { recordedAt: "desc" }, include: { recordedBy: true } } } } } },
-      appointments: { orderBy: { date: "desc" }, include: { dentist: true } },
-      treatments: { orderBy: { createdAt: "desc" }, include: { dentist: true, teeth: { include: { tooth: true } } } },
-      prescriptions: { orderBy: { date: "desc" }, include: { dentist: true, medicines: true } },
-      documents: { orderBy: { uploadedAt: "desc" }, include: { uploadedBy: true } },
-      invoices: { orderBy: { date: "desc" }, include: { items: true, payments: true } },
+      appointments: { where: can(actor,"appointments.view") ? {} : { id: { in: [] } }, orderBy: { date: "desc" }, include: { dentist: true } },
+      treatments: { where: can(actor,"treatments.view") ? {} : { id: { in: [] } }, orderBy: { createdAt: "desc" }, include: { dentist: true, teeth: { include: { tooth: true } } } },
+      prescriptions: { where: can(actor,"prescriptions.view") ? {} : { id: { in: [] } }, orderBy: { date: "desc" }, include: { dentist: true, medicines: true } },
+      documents: { where: can(actor,"documents.view") ? {} : { id: { in: [] } }, orderBy: { uploadedAt: "desc" }, include: { uploadedBy: true } },
+      invoices: { where: can(actor,"billing.view") ? {} : { id: { in: [] } }, orderBy: { date: "desc" }, include: { items: true, payments: true } },
     },
   });
 }

@@ -17,7 +17,7 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-export function OverviewTab({ patient }: { patient: Patient }) {
+export function OverviewTab({ patient, showBilling = false }: { patient: Patient; showBilling?: boolean }) {
   const now = new Date();
   const nextAppointment = patient.appointments
     .filter((a) => a.date >= now && ["SCHEDULED", "CONFIRMED"].includes(a.status))
@@ -122,7 +122,7 @@ export function OverviewTab({ patient }: { patient: Patient }) {
         </CardContent>
       </Card>
 
-      <Card>
+      {showBilling && <Card>
         <CardHeader>
           <CardTitle className="text-base">Outstanding Balance</CardTitle>
         </CardHeader>
@@ -134,7 +134,7 @@ export function OverviewTab({ patient }: { patient: Patient }) {
             across {patient.invoices.filter((i) => i.status !== "PAID").length} open invoice(s)
           </p>
         </CardContent>
-      </Card>
+      </Card>}
     </div>
   );
 }

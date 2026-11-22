@@ -8,7 +8,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { addBed, housekeeping, admit, updateAdmission } from "./actions";
+import { addBed, housekeeping, admit, updateAdmission, collectDeposit } from "./actions";
 
 export default async function Admissions() {
   const user = await requirePermission("ipd.view");
@@ -29,6 +29,11 @@ export default async function Admissions() {
       select: { id: true, name: true },
     }),
   ]);
+  const depositInvoices = can(user, "billing.payments") ? await prisma.invoice.findMany({
+    where: { invoiceNumber: { in: admissions.filter(a => !a.dischargedAt && a.status !== "CANCELLED").map(a => "IPD-" + a.number) } },
+    select: { invoiceNumber: true, total: true },
+  }) : [];
+  const deposits = new Map(depositInvoices.map(i => [i.invoiceNumber, i.total.toString()]));
   const available = beds.filter((b) => b.status === "AVAILABLE");
   const bedOptions = available.map((b) => (
     <option key={b.id} value={b.id}>
@@ -161,6 +166,20 @@ export default async function Admissions() {
               {a.status === "DISCHARGED" && <Link className="text-brand underline" href={`/admissions/${a.id}/print`}>Print discharge summary</Link>}
               {a.encounter && can(user, "opd.view") && (
                 <Link href={`/opd?visit=${a.encounter.id}`}>Clinical workspace</Link>
+              )}
+              {can(user, "billing.payments") && ["ADMITTED", "ACTIVE", "TRANSFERRED", "DISCHARGE_REQUESTED"].includes(a.status) && (
+                <details>
+                  <summary>Collect admission deposit</summary>
+                  <form action={collectDeposit} className="flex flex-wrap items-end gap-3">
+                    <input type="hidden" name="id" value={a.id} />
+                    <input type="hidden" name="expectedTotal" value={deposits.get("IPD-" + a.number) ?? "0"} />
+                    <label>Deposit amount<Input name="amount" type="number" min="0.01" max="99999999" step=".01" required /></label>
+                    <label>Payment method<select name="method" className="block rounded border p-2">
+                      {["CASH", "CARD", "BANK_TRANSFER", "INSURANCE", "OTHER"].map(m => <option key={m}>{m}</option>)}
+                    </select></label>
+                    <Button>Receive deposit</Button>
+                  </form>
+                </details>
               )}
               {a.status === "REQUESTED" && can(user,"ipd.create") && <form action={updateAdmission}><input type="hidden" name="id" value={a.id}/><Button name="action" value="confirm">Confirm admission</Button><Button variant="outline" name="action" value="cancel">Cancel request</Button></form>}
               {a.status === "ADMITTED" && can(user,"ipd.edit") && <form action={updateAdmission}><input type="hidden" name="id" value={a.id}/><Button variant="outline" name="action" value="activate">Mark active</Button></form>}

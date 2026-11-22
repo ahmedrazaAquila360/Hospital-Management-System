@@ -1,3 +1,4 @@
+import { patientScope } from "@/server/patients/access";
 import { readPrivateFile } from "@/lib/storage";
 import path from "node:path";
 import { NextResponse, type NextRequest } from "next/server";
@@ -21,7 +22,7 @@ export async function GET(request: NextRequest, ctx: RouteContext<"/documents/[i
   if (!doc) return new NextResponse("Not found", { status: 404 });
 
   if (doc.patientId && user.role.name === "DENTIST") {
-    const assigned = await prisma.patient.findFirst({ where: { id: doc.patientId, OR: [{ appointments: { some: { dentistId: user.id } } }, { admissions: { some: { doctorId: user.id } } }] }, select: { id: true } });
+    const assigned = await prisma.patient.findFirst({ where: { id: doc.patientId, AND: [patientScope(user)] }, select: { id: true } });
     if (!assigned) return new NextResponse("Forbidden", { status: 403 });
   }
   if (doc.fileUrl.startsWith("private:")) {

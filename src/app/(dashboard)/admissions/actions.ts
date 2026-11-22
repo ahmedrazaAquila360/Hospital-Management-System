@@ -5,6 +5,7 @@ import { z } from "zod";
 import { requirePermission } from "@/lib/auth/guard";
 import { can } from "@/lib/permissions";
 import { paymentSchema } from "@/lib/validations/invoice";
+import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 
 const identifier = z.string().trim().min(1).max(100);
@@ -253,4 +254,41 @@ export async function updateAdmission(form: FormData) {
     });
   });
   revalidatePath("/admissions");
+}
+
+export async function collectDeposit(form: FormData) {
+  const actor = await requirePermission("ipd.view");
+  if (!can(actor, "billing.payments")) throw new Error("Payment permission is required for a deposit.");
+  const data = z.object({
+    id: identifier,
+    amount: z.string().regex(/^\d{1,8}(\.\d{1,2})?$/),
+    expectedTotal: z.string().regex(/^\d{1,10}(\.\d{1,2})?$/),
+    method: paymentSchema.shape.method,
+  }).parse(Object.fromEntries(form));
+  const amount = new Prisma.Decimal(data.amount);
+  if (!amount.gt(0)) throw new Error("Deposit must be greater than zero.");
+  await prisma.$transaction(async tx => {
+    // Match discharge's lock order so deposit collection cannot race settlement.
+    await tx.$queryRaw`SELECT id FROM "Admission" WHERE id = ${data.id} FOR UPDATE`;
+    const admission = await tx.admission.findFirstOrThrow({
+      where: { id: data.id, status: { in: ["ADMITTED", "ACTIVE", "TRANSFERRED", "DISCHARGE_REQUESTED"] }, dischargedAt: null },
+    });
+    const invoiceNumber = "IPD-" + admission.number;
+    await tx.$queryRaw`SELECT id FROM "Invoice" WHERE "invoiceNumber" = ${invoiceNumber} FOR UPDATE`;
+    const existing = await tx.invoice.findUnique({ where: { invoiceNumber }, include: { payments: true } });
+    const previous = existing?.total ?? new Prisma.Decimal(0);
+    if (!previous.equals(data.expectedTotal)) throw new Error("Deposits changed. Refresh before collecting another payment.");
+    const total = previous.plus(amount);
+    if (total.gt("99999999.99")) throw new Error("Total deposits exceed the invoice limit.");
+    const paid = (existing?.payments ?? []).reduce((sum, p) => sum.plus(p.amount), amount);
+    const payment = { patientId: admission.patientId, receivedById: actor.id, amount, method: data.method, reference: "Admission deposit" };
+    const item = { description: "Admission deposit", quantity: 1, unitPrice: amount, amount };
+    const status = paid.gte(total) ? "PAID" : "PARTIALLY_PAID";
+    const invoice = existing
+      ? await tx.invoice.update({ where: { id: existing.id }, data: { total, subtotal: total, status, items: { create: item }, payments: { create: payment } } })
+      : await tx.invoice.create({ data: { invoiceNumber, patientId: admission.patientId, dentistId: admission.doctorId, createdById: actor.id, total, subtotal: total, status, items: { create: item }, payments: { create: payment } } });
+    await tx.activityLog.create({ data: { userId: actor.id, action: "DEPOSIT", entityType: "Admission", entityId: admission.id, metadata: { amount: amount.toFixed(2), invoiceId: invoice.id } } });
+  });
+  revalidatePath("/admissions");
+  revalidatePath("/billing/invoices");
 }
