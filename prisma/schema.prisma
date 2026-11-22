@@ -505,6 +505,7 @@ model InvoiceItem {
 }
 
 model Payment {
+  requestId    String?
   id           String        @id @default(cuid())
   invoiceId    String
   invoice      Invoice       @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
@@ -517,6 +518,7 @@ model Payment {
   receivedById String?
   receivedBy   User?         @relation("PaymentReceivedBy", fields: [receivedById], references: [id])
 
+  @@unique([invoiceId, requestId])
   @@index([invoiceId])
   @@index([patientId])
 }

@@ -13,7 +13,7 @@ The baseline is the six-page DentalHub feature inventory dated November 20, 2026
 | Calendar and booking | Existing day/week/month views, staff schedules, department snapshot and database overlap exclusion | Walk-in shortcut, full concurrency and timezone regression suite |
 | Dental chart and treatment | Historical dental tables and procedure prices retained. Encounter and append-only ClinicalNote handle outpatient documentation | Inpatient notes, signed amendment chains and the combined patient clinical timeline are implemented. Amendment browser regression passed; original notes remain preserved. |
 | Prescriptions | Existing multi-line prescription, appointment association, print and PDF. OPD opens contextual prescription creation | Route and catalog suggestions implemented. Recorded-allergy acknowledgement requires clinician review. Verified interaction data integration remains. |
-| Invoices, expenses and payments | Existing billing, printed invoices, expenses and reports. Payment posting locks the invoice. Completed consultations with configured fees, released tests and dispenses create invoices | Refunds, authorized discounts, deposits and bed charge settlement implemented. Full concurrent posting regression remains. |
+| Invoices, expenses and payments | Existing billing, printed invoices, expenses and reports. Payment posting locks the invoice. Completed consultations with configured fees, released tests and dispenses create invoices | Refunds, authorized discounts, deposits and bed charge settlement implemented. Concurrent payment retry and overpayment regression passed; refund/deposit contention coverage remains. |
 | Files and notifications | Private local clinical uploads, session-checked downloads, private R2 configuration, existing notification bell, lab release event | Review older file grants, remote upload validation and configurable delivery |
 | Hospital settings, departments, doctors | Registration details, department directory and assignments, doctor account profiles, weekly hours and consultation pricing | Service catalog and optional Branch relationships implemented. Branch-level access enforcement remains. |
 | Laboratory | Catalog, prices and reference text, sample tracking, result entry, separate verifier, release and patient history | Printable released report implemented. Range-specific numeric interpretation remains. |
@@ -86,3 +86,15 @@ Repeatable checks:
 - `NODE_OPTIONS='--conditions=react-server' pnpm exec tsx tests/report-calendar-db.test.ts` reads the dedicated hospital database to verify Karachi UTC boundaries and New York 23/25-hour days. It does not write records.
 
 Targeted ESLint and TypeScript passed. Browser smoke checks loaded today/custom reports, the invalid-range fallback, and the dashboard successfully.
+
+## Payment retry and contention follow-up — November 22, 2026
+
+The payment dialog now issues a unique submission ID when opened and retains it for retries. The server still authorizes payment collection, validates the request, and locks the invoice. Repeating the same submission returns success without duplicating the payment, notification or audit entry. Reusing an ID with changed payment details is rejected. Balance arithmetic uses Decimal. A nullable compound unique key on invoice/submission preserves historical payments, deposits and refunds.
+
+Deploy migration `20261122000100_payment_retries` before running this version (`pnpm exec prisma migrate deploy`, then rebuild). The original DentalHub database is not involved.
+
+`RUN_HOSPITAL_TRANSACTION_TESTS=1 NODE_OPTIONS='--conditions=react-server' pnpm exec tsx tests/transaction-concurrency.test.ts` exercises the actual payment transaction with eight simultaneous retries and competing partial payments. It also checks the conditional database writes used for bed allocation and pharmacy stock. Expected losing updates return P2025. Synthetic fixtures are removed afterward. Use a dedicated development database with seeded synthetic admin accounts; this test is explicitly opt-in because it writes fixtures.
+
+The payment service test verified one payment, one notification and one audit event for eight identical submissions. Two different collections exceeding the remaining balance allowed only one payment. Bed/stock guard tests each allowed one winner and retained nonnegative stock. These latter checks cover database primitives, not the complete admission or dispensing action lifecycle. Full concurrent discharge/transfer, refund and dispensing transaction coverage remains.
+
+Production-build browser verification passed: the payment dialog generated its submission ID, recorded a synthetic partial payment and accepted a replay without another payment row. TypeScript, targeted ESLint, the production build and the opt-in concurrency tests passed.

@@ -1,12 +1,13 @@
 "use server";
 
+import { z } from "zod";
+import { postInvoicePayment } from "./payment-transaction";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth/guard";
 import { invoiceSchema, paymentSchema } from "@/lib/validations/invoice";
 import { generateInvoiceNumber } from "@/server/billing/queries";
-import { formatCurrency, toNumber } from "@/lib/format";
 import { can } from "@/lib/permissions";
 
 export type InvoiceFormState = { error?: string };
@@ -105,58 +106,10 @@ export async function recordPaymentAction(_prev: PaymentFormState, formData: For
   });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Please fix the highlighted fields." };
   const data = parsed.data;
+  const request = z.uuid().safeParse(formData.get("requestId"));
+  if (!request.success) return { error: "Reopen the payment form before submitting." };
 
-  const result = await prisma.$transaction(async tx => {
-    await tx.$queryRaw`SELECT id FROM "Invoice" WHERE id = ${data.invoiceId} FOR UPDATE`;
-    const invoice = await tx.invoice.findUnique({
-      where: { id: data.invoiceId },
-      include: { payments: true, patient: true },
-    });
-    if (!invoice) return { error: "Invoice not found." };
-
-    const alreadyPaid = invoice.payments.reduce((sum, p) => sum + toNumber(p.amount), 0);
-    const remaining = toNumber(invoice.total) - alreadyPaid;
-    if (Math.round(data.amount * 100) > Math.round(remaining * 100)) {
-      return { error: `Amount exceeds the remaining balance of $${remaining.toFixed(2)}.` };
-    }
-
-    await tx.payment.create({
-      data: {
-        invoiceId: data.invoiceId,
-        patientId: invoice.patientId,
-        amount: money(data.amount),
-        method: data.method,
-        reference: data.reference || null,
-        receivedById: user.id,
-      },
-    });
-
-    const newPaid = alreadyPaid + data.amount;
-    const newStatus = Math.round(newPaid * 100) >= Math.round(toNumber(invoice.total) * 100) ? "PAID" : newPaid > 0 ? "PARTIALLY_PAID" : "UNPAID";
-
-    await tx.invoice.update({ where: { id: data.invoiceId }, data: { status: newStatus } });
-
-    await tx.notification.create({
-      data: {
-        userId: invoice.createdById ?? user.id,
-        type: "PAYMENT_RECEIVED",
-        title: "Payment received",
-        message: `${formatCurrency(data.amount)} received from ${invoice.patient.fullName} for ${invoice.invoiceNumber}.`,
-        link: `/billing/invoices/${invoice.id}`,
-      },
-    });
-
-    await tx.activityLog.create({
-      data: {
-        userId: user.id,
-        action: "PAYMENT",
-        entityType: "Invoice",
-        entityId: invoice.id,
-        description: `${user.name} recorded a ${formatCurrency(data.amount)} payment for ${invoice.invoiceNumber}.`,
-      },
-    });
-    return { invoice };
-  });
+  const result = await postInvoicePayment({ ...data, requestId: request.data }, user);
   if (!result.invoice) return { error: result.error };
   const { invoice } = result;
 

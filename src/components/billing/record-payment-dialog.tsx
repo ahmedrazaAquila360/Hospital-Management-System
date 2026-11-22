@@ -39,6 +39,7 @@ export function RecordPaymentDialog({
   const router = useRouter();
   const balance = round2(remaining);
   const [open, setOpen] = useState(false);
+  const [requestId, setRequestId] = useState("");
   const [formKey, setFormKey] = useState(0);
   const [amount, setAmount] = useState(balance.toFixed(2));
   const [method, setMethod] = useState("CASH");
@@ -55,6 +56,7 @@ export function RecordPaymentDialog({
     if (isPending) return;
     setOpen(next);
     if (next) {
+      setRequestId(crypto.randomUUID());
       setFormKey((k) => k + 1);
       setAmount(balance.toFixed(2));
       setMethod("CASH");
@@ -64,6 +66,7 @@ export function RecordPaymentDialog({
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (isPending) return;
     if (!(Number.isFinite(value) && value > 0)) return setError("Enter an amount greater than $0.00.");
     if (round2(value) > balance) return setError(`The amount can't be more than the remaining balance of ${money(balance)}.`);
     const formData = new FormData(event.currentTarget);
@@ -104,6 +107,7 @@ export function RecordPaymentDialog({
 
         <form key={formKey} onSubmit={onSubmit} className="flex flex-col">
           <input type="hidden" name="invoiceId" value={invoiceId} />
+          <input type="hidden" name="requestId" value={requestId} />
           <input type="hidden" name="method" value={method} />
           <div className="grid gap-5 px-6 pb-5">
             <dl className="bg-pale/70 grid grid-cols-3 gap-3 rounded-2xl px-4 py-4">
