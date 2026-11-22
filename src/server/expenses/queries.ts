@@ -1,4 +1,6 @@
 import "server-only";
+import { calendarDay, shiftMonth } from "@/lib/report-calendar";
+import { hospitalZone } from "@/server/reports/calendar";
 import { prisma } from "@/lib/prisma";
 import { DEFAULT_PAGE_SIZE } from "@/lib/pagination";
 import { toNumber } from "@/lib/format";
@@ -41,12 +43,12 @@ export async function listExpenses(filters: ExpenseFilters) {
 }
 
 export async function getExpenseSummary() {
-  const monthStart = new Date();
-  monthStart.setDate(1);
-  monthStart.setHours(0, 0, 0, 0);
+  const today = calendarDay(await hospitalZone());
+  const monthStart = new Date(shiftMonth(today, 0));
+  const monthEnd = new Date(shiftMonth(today, 1));
 
   const [thisMonth, byCategory] = await Promise.all([
-    prisma.expense.aggregate({ where: { date: { gte: monthStart } }, _sum: { amount: true } }),
+    prisma.expense.aggregate({ where: { date: { gte: monthStart, lt: monthEnd } }, _sum: { amount: true } }),
     prisma.expense.groupBy({ by: ["category"], _sum: { amount: true }, orderBy: { category: "asc" } }),
   ]);
 

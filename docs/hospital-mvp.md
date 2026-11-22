@@ -8,7 +8,7 @@ The baseline is the six-page DentalHub feature inventory dated November 20, 2026
 |---|---|---|
 | Public website and booking requests | Existing public pages and reception review | Outside the redesign scope |
 | Login, staff, custom roles, user overrides | Database sessions, hospital role defaults and dedicated lab, OPD, IPD and pharmacy action permissions | Verify object access on every inherited route and download |
-| Dashboard and reports | Existing revenue, balance, calendar and registration queries plus OPD, census and bed counts | Emergency census, departmental date filters, activity feed and service revenue totals implemented. Remaining inherited reporting dates require timezone regression. |
+| Dashboard and reports | Existing revenue, balance, calendar and registration queries plus OPD, census and bed counts | Emergency census, departmental date filters, activity feed and service revenue totals implemented. Reporting and dashboard date boundaries now use the hospital timezone; calendar and PostgreSQL daylight-saving regression checks passed. |
 | Patients and medical history | Central Patient ID, sequence-issued MRN, demographic duplicate check, insurance and surgical history, connected visit and admission tabs | Serialized duplicate detection and patient archiving implemented. Retention review for other inherited delete paths remains. |
 | Calendar and booking | Existing day/week/month views, staff schedules, department snapshot and database overlap exclusion | Walk-in shortcut, full concurrency and timezone regression suite |
 | Dental chart and treatment | Historical dental tables and procedure prices retained. Encounter and append-only ClinicalNote handle outpatient documentation | Inpatient notes, signed amendment chains and the combined patient clinical timeline are implemented. Amendment browser regression passed; original notes remain preserved. |
@@ -76,3 +76,13 @@ Browser and database checks confirmed reservation cancellation releases the bed,
 Patient profiles now include a chronological inpatient/outpatient clinical timeline and released laboratory results from both encounter types. Related appointments, prescriptions, procedures, documents and invoices are loaded only with their module permission. The balance card also requires billing permission. Document download assignment checks reuse the patient access rule.
 
 Verification for this increment: production build, TypeScript and targeted ESLint passed. Browser checks confirmed the combined timeline displays original and amended inpatient notes, and a doctor without billing permission sees neither the billing tab nor the outstanding balance card.
+
+## Reporting timezone follow-up — November 22, 2026
+
+Reports convert hospital calendar ranges to UTC timestamp boundaries, including daylight-saving transitions, and use an exclusive end boundary. Appointments and manually dated expenses retain their calendar-date semantics. Expense monthly summaries use the hospital calendar month. Dashboard payment/patient monthly buckets, selected-month registrations, seven-day appointment counts and upcoming dates no longer depend on the application host timezone. The seven-day chart excludes future appointments rather than folding matching weekday names into past buckets. Invalid or reversed custom ranges fall back to the hospital's current day.
+
+Repeatable checks:
+- `pnpm exec tsx tests/report-calendar.test.ts` covers year boundaries, leap dates and invalid/custom ranges. It also passes under Los Angeles and Tokyo host timezones.
+- `NODE_OPTIONS='--conditions=react-server' pnpm exec tsx tests/report-calendar-db.test.ts` reads the dedicated hospital database to verify Karachi UTC boundaries and New York 23/25-hour days. It does not write records.
+
+Targeted ESLint and TypeScript passed. Browser smoke checks loaded today/custom reports, the invalid-range fallback, and the dashboard successfully.

@@ -2,27 +2,28 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { toNumber } from "@/lib/format";
 
-function startOfDay(d = new Date()) {
-  const x = new Date(d);
-  x.setHours(0, 0, 0, 0);
-  return x;
+import { calendarDay, shiftDay, shiftMonth } from "@/lib/report-calendar";
+import { calendarBounds, hospitalZone } from "@/server/reports/calendar";
+
+async function monthlyWindow(months: number) {
+  const zone = await hospitalZone();
+  const day = calendarDay(zone);
+  const first = shiftMonth(day, 1 - months);
+  const bounds = await calendarBounds(first, shiftDay(shiftMonth(day, 1), -1), zone);
+  const buckets = new Map<string, number>();
+  for (let i = 0; i < months; i++) buckets.set(shiftMonth(first, i).slice(0, 7), 0);
+  return { zone, bounds, buckets };
 }
-function startOfMonth(d = new Date()) {
-  return new Date(d.getFullYear(), d.getMonth(), 1);
-}
-function monthsAgo(n: number) {
-  const d = new Date();
-  return new Date(d.getFullYear(), d.getMonth() - n, 1);
+function monthLabel(month: string) {
+  return new Date(month + "-01T00:00:00Z").toLocaleDateString("en-US", { timeZone: "UTC", month: "short", year: "2-digit" });
 }
 
 export async function getDashboardStats(selectedDay?: string, selectedZone?: string) {
-  const zone = selectedZone ?? (await prisma.clinicSettings.findFirst({ select: { timeZone: true } }))?.timeZone ?? "UTC";
-  const day = selectedDay ?? new Intl.DateTimeFormat("en-CA", { timeZone: zone, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
-  const [{ today0, until }] = await prisma.$queryRaw<{today0: Date; until: Date}[]>`SELECT
-    (${day}::date::timestamp AT TIME ZONE ${zone}) AS "today0",
-    ((${day}::date + 1)::timestamp AT TIME ZONE ${zone}) AS until`;
-  const today1 = new Date(until.getTime()-1);
-  const month0 = startOfMonth();
+  const zone = selectedZone ?? await hospitalZone();
+  const day = selectedDay ?? calendarDay(zone);
+  const { start: today0, end: until } = await calendarBounds(day, day, zone);
+  const { start: month0, end: monthEnd } = await calendarBounds(shiftMonth(day, 0), shiftDay(shiftMonth(day, 1), -1), zone);
+
 
   const [
     totalPatients,
@@ -43,14 +44,14 @@ export async function getDashboardStats(selectedDay?: string, selectedZone?: str
         status: { in: ["SCHEDULED", "CONFIRMED", "CHECKED_IN", "IN_PROGRESS"] },
       },
     }),
-    prisma.payment.aggregate({ _sum: { amount: true }, where: { date: { gte: today0, lte: today1 } } }),
+    prisma.payment.aggregate({ _sum: { amount: true }, where: { date: { gte: today0, lt: until } } }),
     prisma.invoice.findMany({
       where: { status: { in: ["UNPAID", "PARTIALLY_PAID"] } },
       select: { total: true, payments: { select: { amount: true } } },
     }),
-    prisma.patient.count({ where: { createdAt: { gte: month0 } } }),
+    prisma.patient.count({ where: { createdAt: { gte: month0, lt: monthEnd } } }),
     prisma.treatment.count({ where: { status: { in: ["PLANNED", "IN_PROGRESS"] } } }),
-    prisma.encounter.count({ where: { appointmentId: { not: null }, checkedInAt: { gte: today0, lte: today1 } } }),
+    prisma.encounter.count({ where: { appointmentId: { not: null }, checkedInAt: { gte: today0, lt: until } } }),
     prisma.admission.count({ where: { dischargedAt: null, status: { notIn:["REQUESTED","CANCELLED"] } } }),
     prisma.bed.groupBy({ by: ["status"], _count: true }),
     prisma.appointment.findMany({ where: { emergency: true, status: { in: ["CHECKED_IN","IN_PROGRESS"] } }, select: { patientId: true }, distinct: ["patientId"] }),
@@ -75,72 +76,45 @@ export async function getDashboardStats(selectedDay?: string, selectedZone?: str
 }
 
 export async function getRevenueOverview(months = 6) {
-  const since = monthsAgo(months - 1);
-  const payments = await prisma.payment.findMany({
-    where: { date: { gte: since } },
-    select: { amount: true, date: true },
-  });
-
-  const buckets = new Map<string, number>();
-  for (let i = months - 1; i >= 0; i--) {
-    const d = monthsAgo(i);
-    buckets.set(d.toLocaleDateString("en-US", { month: "short", year: "2-digit" }), 0);
+  const { zone, bounds, buckets } = await monthlyWindow(months);
+  const payments = await prisma.payment.findMany({ where: { date: { gte: bounds.start, lt: bounds.end } }, select: { amount: true, date: true } });
+  for (const payment of payments) {
+    const key = calendarDay(zone, payment.date).slice(0, 7);
+    if (buckets.has(key)) buckets.set(key, buckets.get(key)! + toNumber(payment.amount));
   }
-  for (const p of payments) {
-    const key = p.date.toLocaleDateString("en-US", { month: "short", year: "2-digit" });
-    if (buckets.has(key)) buckets.set(key, (buckets.get(key) ?? 0) + toNumber(p.amount));
-  }
-
-  return Array.from(buckets.entries()).map(([month, revenue]) => ({ month, revenue }));
+  return Array.from(buckets, ([month, revenue]) => ({ month: monthLabel(month), revenue }));
 }
 
 export async function getAppointmentStats() {
-  const since = new Date();
-  since.setDate(since.getDate() - 6);
-  since.setHours(0, 0, 0, 0);
-
+  const today = calendarDay(await hospitalZone());
+  const first = shiftDay(today, -6);
   const appointments = await prisma.appointment.findMany({
-    where: { date: { gte: since } },
+    where: { date: { gte: new Date(first), lt: new Date(shiftDay(today, 1)) } },
     select: { date: true, status: true },
   });
-
   const buckets = new Map<string, { day: string; completed: number; cancelled: number; scheduled: number }>();
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    const key = d.toLocaleDateString("en-US", { weekday: "short" });
-    buckets.set(key, { day: key, completed: 0, cancelled: 0, scheduled: 0 });
+  for (let i = 0; i < 7; i++) {
+    const key = shiftDay(first, i);
+    buckets.set(key, { day: new Date(key).toLocaleDateString("en-US", { weekday: "short", timeZone: "UTC" }), completed: 0, cancelled: 0, scheduled: 0 });
   }
-  for (const a of appointments) {
-    const key = a.date.toLocaleDateString("en-US", { weekday: "short" });
-    const bucket = buckets.get(key);
+  for (const appointment of appointments) {
+    const bucket = buckets.get(appointment.date.toISOString().slice(0, 10));
     if (!bucket) continue;
-    if (a.status === "COMPLETED") bucket.completed++;
-    else if (a.status === "CANCELLED" || a.status === "NO_SHOW") bucket.cancelled++;
+    if (appointment.status === "COMPLETED") bucket.completed++;
+    else if (["CANCELLED", "NO_SHOW"].includes(appointment.status)) bucket.cancelled++;
     else bucket.scheduled++;
   }
-
   return Array.from(buckets.values());
 }
 
 export async function getPatientGrowth(months = 6) {
-  const since = monthsAgo(months - 1);
-  const patients = await prisma.patient.findMany({
-    where: { createdAt: { gte: since } },
-    select: { createdAt: true },
-  });
-
-  const buckets = new Map<string, number>();
-  for (let i = months - 1; i >= 0; i--) {
-    const d = monthsAgo(i);
-    buckets.set(d.toLocaleDateString("en-US", { month: "short", year: "2-digit" }), 0);
+  const { zone, bounds, buckets } = await monthlyWindow(months);
+  const patients = await prisma.patient.findMany({ where: { createdAt: { gte: bounds.start, lt: bounds.end } }, select: { createdAt: true } });
+  for (const patient of patients) {
+    const key = calendarDay(zone, patient.createdAt).slice(0, 7);
+    if (buckets.has(key)) buckets.set(key, buckets.get(key)! + 1);
   }
-  for (const p of patients) {
-    const key = p.createdAt.toLocaleDateString("en-US", { month: "short", year: "2-digit" });
-    if (buckets.has(key)) buckets.set(key, (buckets.get(key) ?? 0) + 1);
-  }
-
-  return Array.from(buckets.entries()).map(([month, patients]) => ({ month, patients }));
+  return Array.from(buckets, ([month, patients]) => ({ month: monthLabel(month), patients }));
 }
 
 export async function getTreatmentStats() {
@@ -163,8 +137,7 @@ export async function getTodayAppointments(day: string, dentistId?: string) {
 }
 
 export async function getUpcomingAppointments(dentistId?: string) {
-  const tomorrow = startOfDay();
-  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrow = new Date(shiftDay(calendarDay(await hospitalZone()), 1));
   return prisma.appointment.findMany({
     where: { dentistId, date: { gte: tomorrow }, status: { in: ["SCHEDULED", "CONFIRMED"] } },
     include: { patient: true, dentist: true },

@@ -1,28 +1,22 @@
+import { calendarDay, shiftDay, validDay } from "./report-calendar";
+
 export type ReportRange = "today" | "week" | "month" | "year" | "custom";
 
-export function resolveRange(range: ReportRange, from?: string, to?: string) {
-  const now = new Date();
-  const end = new Date(now);
-  end.setHours(23, 59, 59, 999);
-
-  if (range === "custom" && from && to) {
-    const start = new Date(`${from}T00:00:00`);
-    const customEnd = new Date(`${to}T23:59:59`);
-    return { start, end: customEnd };
-  }
-
-  const start = new Date(now);
-  start.setHours(0, 0, 0, 0);
-
-  if (range === "week") {
-    start.setDate(start.getDate() - start.getDay());
+export function resolveRange(range: ReportRange, from?: string, to?: string, zone = "UTC", now = new Date()) {
+  const today = calendarDay(zone, now);
+  let first = today;
+  let last = today;
+  if (range === "custom" && validDay(from) && validDay(to) && from <= to) {
+    first = from;
+    last = to;
+  } else if (range === "week") {
+    first = shiftDay(today, -new Date(today).getUTCDay());
   } else if (range === "month") {
-    start.setDate(1);
+    first = today.slice(0, 7) + "-01";
   } else if (range === "year") {
-    start.setMonth(0, 1);
+    first = today.slice(0, 4) + "-01-01";
   }
-
-  return { start, end };
+  return { first, last, start: new Date(first), end: new Date(shiftDay(last, 1)) };
 }
 
 export const RANGE_LABEL: Record<ReportRange, string> = {

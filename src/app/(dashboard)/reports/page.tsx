@@ -14,6 +14,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { requirePermission } from "@/lib/auth/guard";
+import { calendarBounds } from "@/server/reports/calendar";
 import { resolveRange, RANGE_LABEL, type ReportRange } from "@/lib/reports";
 import {
   getAppointmentReport,
@@ -27,7 +28,7 @@ import { PrintReportButton } from "@/components/reports/print-button";
 import { PageHeader } from "@/components/shared/page-header";
 import { StatCard } from "@/components/shared/stat-card";
 import { BrandMark } from "@/components/brand/brand-logo";
-import { formatCurrency, formatDate, formatDateTime } from "@/lib/format";
+import { formatCurrency } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Reports" };
@@ -38,17 +39,18 @@ export default async function ReportsPage({ searchParams }: { searchParams: Sear
   await requirePermission("reports.view");
   const params = await searchParams;
   const range = (["today", "week", "month", "year", "custom"].includes(params.range ?? "") ? params.range : "month") as ReportRange;
-  const { start, end } = resolveRange(range, params.from, params.to);
+  const clinic = await getClinicSettings();
+  const dates = resolveRange(range, params.from, params.to, clinic.timeZone);
+  const { start, end } = await calendarBounds(dates.first, dates.last, clinic.timeZone);
 
-  const [patients, appointments, financial, treatments, clinic] = await Promise.all([
-    getPatientReport(start, end),
-    getAppointmentReport(start, end),
-    getFinancialReport(start, end),
+  const [patients, appointments, financial, treatments] = await Promise.all([
+    getPatientReport(start, end, dates.start, dates.end),
+    getAppointmentReport(dates.start, dates.end),
+    getFinancialReport(start, end, dates.start, dates.end),
     getTreatmentReport(start, end),
-    getClinicSettings(),
   ]);
-  const period = `${formatDate(start)} – ${formatDate(end)}`;
-  const generatedAt = formatDateTime(new Date());
+  const period = `${dates.first} – ${dates.last}`;
+  const generatedAt = new Date().toLocaleString("en-US", { timeZone: clinic.timeZone });
   const otherAppointments = Math.max(0, appointments.total - appointments.completed - appointments.cancelled - appointments.noShow);
   const maxTreatment = Math.max(1, ...treatments.mostCommon.map((t) => t.count));
   const maxMoney = Math.max(1, financial.revenue, financial.expenses);
