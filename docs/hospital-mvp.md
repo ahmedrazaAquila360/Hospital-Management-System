@@ -95,7 +95,7 @@ Deploy migration `20261122000100_payment_retries` before running this version (`
 
 `RUN_HOSPITAL_TRANSACTION_TESTS=1 NODE_OPTIONS='--conditions=react-server' pnpm exec tsx tests/transaction-concurrency.test.ts` exercises the actual payment transaction with eight simultaneous retries and competing partial payments. It also checks the conditional database writes used for bed allocation and pharmacy stock. Expected losing updates return P2025. Synthetic fixtures are removed afterward. Use a dedicated development database with seeded synthetic admin accounts; this test is explicitly opt-in because it writes fixtures.
 
-The payment service test verified one payment, one notification and one audit event for eight identical submissions. Two different collections exceeding the remaining balance allowed only one payment. Bed/stock guard tests each allowed one winner and retained nonnegative stock. These latter checks cover database primitives, not the complete admission or dispensing action lifecycle. Full concurrent discharge/transfer, deposit and dispensing transaction coverage remains.
+The payment service test verified one payment, one notification and one audit event for eight identical submissions. Two different collections exceeding the remaining balance allowed only one payment. Bed/stock guard tests each allowed one winner and retained nonnegative stock. These latter checks cover database primitives, not the complete admission or dispensing action lifecycle. Full concurrent discharge/transfer, deposit and pharmacy-return transaction coverage remains. Dispensing creation is covered by the later pharmacy tests.
 
 Production-build browser verification passed: the payment dialog generated its submission ID, recorded a synthetic partial payment and accepted a replay without another payment row. TypeScript, targeted ESLint, the production build and the opt-in concurrency tests passed.
 
@@ -106,3 +106,13 @@ Refund collection uses the existing payment submission key and invoice row lock.
 The transaction test now covers eight identical refund retries, competing refunds that exceed available net payments, and a simultaneous payment/refund. It verifies final net payments, invoice status and refund audit count. No additional migration is required beyond `20261122000100_payment_retries`.
 
 Verification: production build, TypeScript, targeted lint and the expanded transaction tests passed. Production-browser checks confirmed refund creation and an acknowledged retry without a second refund. The cashier had no refund form, and a direct server-action request returned “Refund permission required” without changing payment records.
+
+## Pharmacy transaction follow-up — November 23, 2026
+
+Dispensing now locks the prescription line before touching batch stock. Identical retries return its existing fill; attempts to change the batch or quantity of an already filled line are rejected. The original one-fill constraint remains in place. The server action still requires pharmacy.edit and explicit pharmacist verification. Stock deduction, low-stock notification, invoice, dispensing record and audit remain one transaction. No migration is required.
+
+`RUN_HOSPITAL_TRANSACTION_TESTS=1 NODE_OPTIONS='--conditions=react-server' pnpm exec tsx tests/pharmacy-concurrency.test.ts` exercises the actual dispensing transaction against dedicated development data and cleans up its synthetic fixtures. Eight simultaneous identical submissions created one fill/invoice/audit and deducted stock once. Competing prescriptions could not oversell a batch. Expired batches and mismatched medicine names were rejected. A forced invoice foreign-key failure after stock deduction rolled the deduction back. Only successful fills created invoice items and charges.
+
+This covers full dispensing creation and retries, but does not cover concurrent returns or all stock receiving/adjustment paths. Admission/transfer/discharge contention testing also remains outstanding. Partial dispensing and verified medication-interaction data remain outside this increment.
+
+Verification for the pharmacy increment: production build, TypeScript, targeted ESLint and the full dispensing transaction regression tests passed. The existing pharmacy interface is unchanged.
