@@ -189,6 +189,7 @@ export default async function Admissions() {
                     <>
                       <form action={updateAdmission}>
                         <input type="hidden" name="id" value={a.id} />
+                        <input type="hidden" name="expectedBedId" value={a.bedId} />
                         <select aria-label="Transfer destination" name="bedId" required>
                           {bedOptions}
                         </select>

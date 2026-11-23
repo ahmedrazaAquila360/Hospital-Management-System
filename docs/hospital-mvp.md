@@ -13,12 +13,12 @@ The baseline is the six-page DentalHub feature inventory dated November 20, 2026
 | Calendar and booking | Existing day/week/month views, staff schedules, department snapshot and database overlap exclusion | Walk-in shortcut, full concurrency and timezone regression suite |
 | Dental chart and treatment | Historical dental tables and procedure prices retained. Encounter and append-only ClinicalNote handle outpatient documentation | Inpatient notes, signed amendment chains and the combined patient clinical timeline are implemented. Amendment browser regression passed; original notes remain preserved. |
 | Prescriptions | Existing multi-line prescription, appointment association, print and PDF. OPD opens contextual prescription creation | Route and catalog suggestions implemented. Recorded-allergy acknowledgement requires clinician review. Verified interaction data integration remains. |
-| Invoices, expenses and payments | Existing billing, printed invoices, expenses and reports. Payment posting locks the invoice. Completed consultations with configured fees, released tests and dispenses create invoices | Refunds, authorized discounts, deposits and bed charge settlement implemented. Concurrent payment retry and overpayment regression passed; Concurrent refund and mixed payment/refund checks also passed; deposit contention coverage remains. |
+| Invoices, expenses and payments | Existing billing, printed invoices, expenses and reports. Payment posting locks the invoice. Completed consultations with configured fees, released tests and dispenses create invoices | Refunds, authorized discounts, deposits and bed charge settlement implemented. Concurrent payment retry and overpayment regression passed; Concurrent refund and mixed payment/refund checks also passed; deposit/discharge contention checks passed. |
 | Files and notifications | Private local clinical uploads, session-checked downloads, private R2 configuration, existing notification bell, lab release event | Review older file grants, remote upload validation and configurable delivery |
 | Hospital settings, departments, doctors | Registration details, department directory and assignments, doctor account profiles, weekly hours and consultation pricing | Service catalog and optional Branch relationships implemented. Branch-level access enforcement remains. |
 | Laboratory | Catalog, prices and reference text, sample tracking, result entry, separate verifier, release and patient history | Printable released report implemented. Range-specific numeric interpretation remains. |
 | Pharmacy | Medication and batch records, receiving, expiry/quantity guard, audited dispensing, invoice linkage | Returns, audited adjustments and expiry indicators implemented. Partial fills and scheduled expiry notifications remain. |
-| Admissions and beds | Ward/room/bed identifiers, bed board, transfers, discharge request, signed summary and housekeeping | Inpatient clinical workspace, orders, deposits, bed tariffs and discharge invoice implemented. Reservation cancellation/confirmation and deposit settlement browser checks passed. Multi-user contention coverage remains. |
+| Admissions and beds | Ward/room/bed identifiers, bed board, transfers, discharge request, signed summary and housekeeping | Inpatient clinical workspace, orders, deposits, bed tariffs and discharge invoice implemented. Reservation cancellation/confirmation and deposit settlement browser checks passed. Admission, transfer, discharge and deposit transaction contention checks passed. |
 
 ## Relationships and consistency
 
@@ -59,7 +59,7 @@ Grant lab.approve to a verifier through Permissions. Grant ipd.approve to staff 
 
 The production build, TypeScript check and lint of changed source files passed. Browser checks using synthetic records passed for patient registration, appointment booking, check-in, consultation notes, prescription creation, laboratory processing and release by a separate user, admission and discharge, pharmacy dispensing, payment, partial stock return, refund and printable laboratory report. The stock check confirmed 20 units became 18 after dispensing two, then 19 after returning one. Net payment after the refund matched the reduced invoice total. Cashier attempts to open OPD, laboratory, patients and admissions reached permission-denied pages.
 
-Admission reservation, deposit settlement and signed amendment browser checks have passed. Concurrent-write paths still need dedicated contention tests. The current implementation remains a development MVP pending those checks and the outstanding items in the feature mapping.
+Admission reservation, deposit settlement and signed amendment browser checks have passed. The inpatient, payment/refund and pharmacy transaction contention suites described below have passed. The current implementation remains a development MVP pending the outstanding items in the feature mapping.
 
 Local development uses database hospital_management_mvp. Staff login credentials use HOSPITAL_DEMO_PASSWORD in the local .env file. The seed uses synthetic accounts only. The retained DENTIST database role is displayed as Doctor.
 
@@ -95,7 +95,7 @@ Deploy migration `20261122000100_payment_retries` before running this version (`
 
 `RUN_HOSPITAL_TRANSACTION_TESTS=1 NODE_OPTIONS='--conditions=react-server' pnpm exec tsx tests/transaction-concurrency.test.ts` exercises the actual payment transaction with eight simultaneous retries and competing partial payments. It also checks the conditional database writes used for bed allocation and pharmacy stock. Expected losing updates return P2025. Synthetic fixtures are removed afterward. Use a dedicated development database with seeded synthetic admin accounts; this test is explicitly opt-in because it writes fixtures.
 
-The payment service test verified one payment, one notification and one audit event for eight identical submissions. Two different collections exceeding the remaining balance allowed only one payment. Bed/stock guard tests each allowed one winner and retained nonnegative stock. These latter checks cover database primitives, not the complete admission or dispensing action lifecycle. Full concurrent discharge/transfer and deposit transaction coverage remains. Pharmacy returns are covered by the later tests. Dispensing creation is covered by the later pharmacy tests.
+The payment service test verified one payment, one notification and one audit event for eight identical submissions. Two different collections exceeding the remaining balance allowed only one payment. Bed/stock guard tests each allowed one winner and retained nonnegative stock. These latter checks cover database primitives, not the complete admission or dispensing action lifecycle. Discharge/transfer and deposit transaction coverage was completed in the later inpatient suite. Pharmacy returns are covered by the later tests. Dispensing creation is covered by the later pharmacy tests.
 
 Production-build browser verification passed: the payment dialog generated its submission ID, recorded a synthetic partial payment and accepted a replay without another payment row. TypeScript, targeted ESLint, the production build and the opt-in concurrency tests passed.
 
@@ -113,7 +113,7 @@ Dispensing now locks the prescription line before touching batch stock. Identica
 
 `RUN_HOSPITAL_TRANSACTION_TESTS=1 NODE_OPTIONS='--conditions=react-server' pnpm exec tsx tests/pharmacy-concurrency.test.ts` exercises the actual dispensing transaction against dedicated development data and cleans up its synthetic fixtures. Eight simultaneous identical submissions created one fill/invoice/audit and deducted stock once. Competing prescriptions could not oversell a batch. Expired batches and mismatched medicine names were rejected. A forced invoice foreign-key failure after stock deduction rolled the deduction back. Only successful fills created invoice items and charges.
 
-This covers full dispensing creation and retries, but does not cover concurrent returns or all stock receiving/adjustment paths. Admission/transfer/discharge contention testing also remains outstanding. Partial dispensing and verified medication-interaction data remain outside this increment.
+This covers full dispensing creation and retries, but does not cover concurrent returns or all stock receiving/adjustment paths. Admission/transfer/discharge contention testing was completed in the later inpatient suite. Partial dispensing and verified medication-interaction data remain outside this increment.
 
 Verification for the pharmacy increment: production build, TypeScript, targeted ESLint and the full dispensing transaction regression tests passed. The existing pharmacy interface is unchanged.
 
@@ -123,4 +123,21 @@ Return forms submit the previously returned quantity. After locking the dispensi
 
 The pharmacy transaction regression now covers eight competing identical returns (one credit/restock), excessive return quantities, a simultaneous return and payment refund, and an audit failure after credit/restocking. It verifies the final invoice total, item sum, net payments, status, returned units and batch quantity. The failure case restored all balances. Returns marked unsuitable for restocking reduce the invoice without increasing stock.
 
-Return verification passed: production build, TypeScript, targeted ESLint and the expanded pharmacy transaction suite. Admission, transfer, discharge and deposit contention checks remain outstanding.
+Return verification passed: production build, TypeScript, targeted ESLint and the expanded pharmacy transaction suite. Admission, transfer, discharge and deposit contention checks were subsequently completed below.
+
+## Inpatient transaction concurrency — November 23, 2026
+
+Admission creation, status changes and deposit posting now live in internal transaction services called by the existing authorized server actions. Transfers include the original bed ID and check it after locking the admission; a stale concurrent transfer cannot move the patient a second time. No migration or visual redesign is required.
+
+Run `RUN_HOSPITAL_TRANSACTION_TESTS=1 NODE_OPTIONS='--conditions=react-server' pnpm exec tsx tests/admission-concurrency.test.ts` against the dedicated seeded development database. It creates and removes synthetic patients, beds and related records. The suite covers:
+
+- Two patients requesting the same bed and one patient requesting two beds: one admission succeeds, with no stranded allocation.
+- Competing transfers of one admission and two admissions targeting one destination: one transfer succeeds, and stays/bed statuses remain consistent.
+- Reservation confirmation versus cancellation: one decision takes effect with the matching encounter and bed state.
+- Eight identical deposit submissions: one collection, followed by a deposit/discharge race with no lost payment.
+- Concurrent discharge retries and transfer attempts during discharge: one settlement invoice/audit, no open stay, and the bed marked cleaning.
+- Failures after writes during admission, transfer, deposit and discharge: all related bed, stay and financial changes roll back.
+
+These checks replace the previously outstanding inpatient transaction contention checks for these scenarios. They do not establish complete clinical-pilot readiness: broader inherited route authorization, branch scoping, medication safety data and remaining feature acceptance still need review.
+
+Final verification for this increment: targeted ESLint, TypeScript through the production build, the production build itself and the inpatient transaction regression suite passed.
