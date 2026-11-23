@@ -2,6 +2,7 @@ import "dotenv/config";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { prisma } from "../src/lib/prisma";
+import { postInvoiceRefund } from "../src/server/billing/refund-transaction";
 import { postInvoicePayment } from "../src/server/billing/payment-transaction";
 
 async function main() {
@@ -31,6 +32,26 @@ async function main() {
     assert.equal((await prisma.invoice.findUniqueOrThrow({ where: { id: invoice.id } })).status, "PARTIALLY_PAID");
     console.log("Payment transaction: eight retries create one payment/audit/notification; competing collections cannot overpay.");
 
+    const refund = { invoiceId: invoice.id, requestId: randomUUID(), amount: "10", reason: "Synthetic refund", method: "CASH" as const };
+    const refundRetries = await Promise.all(Array.from({ length: 8 }, () => postInvoiceRefund(refund, actor.id)));
+    assert.ok(refundRetries.every(r => !!r.patientId));
+    assert.equal(await prisma.payment.count({ where: { invoiceId: invoice.id, amount: { lt: 0 } } }), 1);
+    assert.ok((await postInvoiceRefund({ ...refund, amount: "11" }, actor.id)).error);
+    const refunds = await Promise.all(Array.from({ length: 2 }, () => postInvoiceRefund({ ...refund, requestId: randomUUID(), amount: "50" }, actor.id)));
+    assert.equal(refunds.filter(r => !!r.patientId).length, 1);
+    assert.equal(refunds.filter(r => !!r.error).length, 1);
+    // Starting net is 20. Either ordering must end at 25 without a lost update.
+    await Promise.all([
+      postInvoicePayment({ ...request, amount: 10, requestId: randomUUID() }, actor),
+      postInvoiceRefund({ ...refund, amount: "5", requestId: randomUUID() }, actor.id),
+    ]);
+    const net = await prisma.payment.aggregate({ where: { invoiceId: invoice.id }, _sum: { amount: true } });
+    assert.equal(net._sum.amount?.toString(), "25");
+    assert.equal((await prisma.invoice.findUniqueOrThrow({ where: { id: invoice.id } })).status, "PARTIALLY_PAID");
+    const refundRows = await prisma.payment.findMany({ where: { invoiceId: invoice.id, amount: { lt: 0 } }, select: { id: true } });
+    assert.equal(await prisma.activityLog.count({ where: { entityId: { in: refundRows.map(p => p.id) }, action: "REFUND" } }), 3);
+    console.log("Refund transaction: duplicate retries, competing refunds and mixed payment/refund totals passed.");
+
     // Exercise the same conditional database writes used in admission and dispensing.
     const bed = await prisma.bed.create({ data: { ward: tag, room: "Test", label: "1", category: "Synthetic" } });
     bedId = bed.id;
@@ -47,7 +68,8 @@ async function main() {
     console.log("Database guards: one competing bed allocation and one stock deduction succeed; stock stays nonnegative.");
   } finally {
     await prisma.notification.deleteMany({ where: { link: { in: invoiceIds.map(id => `/billing/invoices/${id}`) } } });
-    await prisma.activityLog.deleteMany({ where: { entityId: { in: invoiceIds } } });
+    const payments = await prisma.payment.findMany({ where: { invoiceId: { in: invoiceIds } }, select: { id: true } });
+    await prisma.activityLog.deleteMany({ where: { entityId: { in: [...invoiceIds, ...payments.map(p => p.id)] } } });
     await prisma.invoice.deleteMany({ where: { id: { in: invoiceIds } } });
     if (bedId) await prisma.bed.delete({ where: { id: bedId } });
     if (medicationId) {

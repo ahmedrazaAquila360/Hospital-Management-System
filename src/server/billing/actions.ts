@@ -1,6 +1,7 @@
 "use server";
 
 import { z } from "zod";
+import { postInvoiceRefund } from "./refund-transaction";
 import { postInvoicePayment } from "./payment-transaction";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -122,23 +123,23 @@ export async function recordPaymentAction(_prev: PaymentFormState, formData: For
   return { success: true };
 }
 
-export async function refundPayment(form: FormData) {
+export async function refundPayment(form: FormData): Promise<PaymentFormState> {
   const actor = await requireUser();
-  if (!can(actor,"billing.refund")) throw new Error("Refund permission required.");
-  const id = String(form.get("invoiceId") ?? "");
-  const reason = String(form.get("reason") ?? "").trim();
-  const amount = String(form.get("amount") ?? "");
-  const method = paymentSchema.shape.method.parse(form.get("method"));
-  if (!reason || reason.length > 250 || !/^\d{1,8}(\.\d{1,2})?$/.test(amount) || Number(amount) <= 0) throw new Error("Enter a refund amount and reason.");
-  await prisma.$transaction(async tx => {
-    await tx.$queryRaw`SELECT id FROM "Invoice" WHERE id = ${id} FOR UPDATE`;
-    const invoice = await tx.invoice.findUniqueOrThrow({ where: { id }, include: { payments: true } });
-    const netCents = invoice.payments.reduce((s,p) => s + Math.round(p.amount.toNumber()*100),0) - Math.round(Number(amount)*100);
-    if (netCents < 0) throw new Error("Refund exceeds net payments.");
-    const refund = await tx.payment.create({ data: { invoiceId: id, patientId: invoice.patientId, method, amount: -Number(amount), reference: reason, receivedById: actor.id } });
-    await tx.invoice.update({ where: { id }, data: { status: netCents >= Math.round(invoice.total.toNumber()*100) ? "PAID" : netCents ? "PARTIALLY_PAID" : "UNPAID" } });
-    await tx.activityLog.create({ data: { userId: actor.id, entityType: "Payment", entityId: refund.id, action: "REFUND", description: reason } });
-  });
-  revalidatePath("/billing/invoices/" + id);
+  if (!can(actor, "billing.refund")) return { error: "Refund permission required." };
+  const parsed = z.object({
+    invoiceId: z.string().min(1), requestId: z.uuid(),
+    reason: z.string().trim().min(1, "Enter a refund reason.").max(250),
+    amount: z.string().regex(/^\d{1,8}(\.\d{1,2})?$/).refine(value => Number(value) > 0, "Enter a positive refund amount."),
+    method: paymentSchema.shape.method,
+  }).safeParse(Object.fromEntries(form));
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the refund details." };
+  const result = await postInvoiceRefund(parsed.data, actor.id);
+  if (!result.patientId) return { error: result.error };
+  revalidatePath("/billing/invoices/" + parsed.data.invoiceId);
+  revalidatePath("/billing/invoices");
   revalidatePath("/billing/payments");
+  revalidatePath("/patients/" + result.patientId);
+  revalidatePath("/dashboard");
+  revalidatePath("/reports");
+  return { success: true };
 }

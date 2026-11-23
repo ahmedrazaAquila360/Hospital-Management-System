@@ -20,9 +20,7 @@ import {
 import { requirePermission } from "@/lib/auth/guard";
 import { getInvoiceById, invoicePaidAmount } from "@/server/billing/queries";
 import { Button } from "@/components/ui/button";
-import { refundPayment } from "@/server/billing/actions";
-import { Input } from "@/components/ui/input";
-import { PAYMENT_METHODS } from "@/lib/validations/invoice";
+import { RefundForm } from "@/components/billing/refund-form";
 import { RecordPaymentDialog } from "@/components/billing/record-payment-dialog";
 import { InvoiceStatusPill } from "@/components/billing/invoice-status";
 import { formatCurrency, formatDate, formatDateTime, toNumber } from "@/lib/format";
@@ -109,8 +107,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
       </section>
 
       {can(user,"billing.refund") && paid > 0 && <details className="surface-card p-5"><summary>Record refund</summary>
-        <form action={refundPayment} className="mt-3 grid gap-3 sm:grid-cols-3"><input type="hidden" name="invoiceId" value={id}/><label>Amount<Input name="amount" type="number" min=".01" step=".01" max={paid} required /></label>
-          <label>Reason<Input name="reason" required maxLength={250}/></label><label>Method<select name="method" className="block">{PAYMENT_METHODS.map(m=><option key={m}>{m}</option>)}</select></label><Button>Record refund</Button></form></details>}
+        <RefundForm invoiceId={id} paid={paid}/></details>}
       {/* Key facts */}
       <section className="surface-card grid grid-cols-1 gap-y-4 p-5 sm:grid-cols-2 sm:p-6 xl:grid-cols-4 xl:divide-x xl:divide-border/70">
         <Fact icon={UserRound} label="Patient">
