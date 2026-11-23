@@ -95,7 +95,7 @@ Deploy migration `20261122000100_payment_retries` before running this version (`
 
 `RUN_HOSPITAL_TRANSACTION_TESTS=1 NODE_OPTIONS='--conditions=react-server' pnpm exec tsx tests/transaction-concurrency.test.ts` exercises the actual payment transaction with eight simultaneous retries and competing partial payments. It also checks the conditional database writes used for bed allocation and pharmacy stock. Expected losing updates return P2025. Synthetic fixtures are removed afterward. Use a dedicated development database with seeded synthetic admin accounts; this test is explicitly opt-in because it writes fixtures.
 
-The payment service test verified one payment, one notification and one audit event for eight identical submissions. Two different collections exceeding the remaining balance allowed only one payment. Bed/stock guard tests each allowed one winner and retained nonnegative stock. These latter checks cover database primitives, not the complete admission or dispensing action lifecycle. Full concurrent discharge/transfer, deposit and pharmacy-return transaction coverage remains. Dispensing creation is covered by the later pharmacy tests.
+The payment service test verified one payment, one notification and one audit event for eight identical submissions. Two different collections exceeding the remaining balance allowed only one payment. Bed/stock guard tests each allowed one winner and retained nonnegative stock. These latter checks cover database primitives, not the complete admission or dispensing action lifecycle. Full concurrent discharge/transfer and deposit transaction coverage remains. Pharmacy returns are covered by the later tests. Dispensing creation is covered by the later pharmacy tests.
 
 Production-build browser verification passed: the payment dialog generated its submission ID, recorded a synthetic partial payment and accepted a replay without another payment row. TypeScript, targeted ESLint, the production build and the opt-in concurrency tests passed.
 
@@ -116,3 +116,11 @@ Dispensing now locks the prescription line before touching batch stock. Identica
 This covers full dispensing creation and retries, but does not cover concurrent returns or all stock receiving/adjustment paths. Admission/transfer/discharge contention testing also remains outstanding. Partial dispensing and verified medication-interaction data remain outside this increment.
 
 Verification for the pharmacy increment: production build, TypeScript, targeted ESLint and the full dispensing transaction regression tests passed. The existing pharmacy interface is unchanged.
+
+## Pharmacy return follow-up — November 23, 2026
+
+Return forms submit the previously returned quantity. After locking the dispensing row, the server rejects a stale submission before creating a credit or restocking. Invoice credits, returned quantity, optional restocking and audit creation remain atomic. The existing pharmacy.edit authorization remains in the server action. No migration is required.
+
+The pharmacy transaction regression now covers eight competing identical returns (one credit/restock), excessive return quantities, a simultaneous return and payment refund, and an audit failure after credit/restocking. It verifies the final invoice total, item sum, net payments, status, returned units and batch quantity. The failure case restored all balances. Returns marked unsuitable for restocking reduce the invoice without increasing stock.
+
+Return verification passed: production build, TypeScript, targeted ESLint and the expanded pharmacy transaction suite. Admission, transfer, discharge and deposit contention checks remain outstanding.

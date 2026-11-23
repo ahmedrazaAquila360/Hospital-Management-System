@@ -112,6 +112,7 @@ export default async function Pharmacy() {
                     eligible
                   </p>
                   <input type="hidden" name="fillId" value={f.id} />
+                  <input type="hidden" name="expectedReturned" value={f.returned} />
                   <label>
                     Quantity
                     <Input type="number" name="quantity" min="1" max={f.quantity - f.returned} required />

@@ -1,5 +1,6 @@
 "use server";
 
+import { returnDispensedStock } from "@/server/pharmacy/return-transaction";
 import { dispensePrescription } from "@/server/pharmacy/dispense-transaction";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -79,59 +80,8 @@ export async function dispense(form: FormData) {
 
 export async function returnStock(form: FormData) {
   const actor = await requirePermission("pharmacy.edit");
-  const data = z.object({ fillId: field, quantity, reason: field }).parse(Object.fromEntries(form));
-  await prisma.$transaction(async (tx) => {
-    await tx.$queryRaw`SELECT id FROM "Dispensing" WHERE id = ${data.fillId} FOR UPDATE`;
-    const fill = await tx.dispensing.findUniqueOrThrow({
-      where: { id: data.fillId },
-      include: { batch: true },
-    });
-    if (data.quantity > fill.quantity - fill.returned)
-      throw new Error("Return exceeds the dispensed quantity.");
-    await tx.$queryRaw`SELECT id FROM "Invoice" WHERE id = ${fill.invoiceId} FOR UPDATE`;
-    const invoice = await tx.invoice.findUniqueOrThrow({
-      where: { id: fill.invoiceId },
-      include: { payments: true, items: true },
-    });
-    const original = invoice.items.find((i) => i.quantity > 0);
-    if (!original) throw new Error("Missing sale line.");
-    const credit = original.unitPrice.mul(data.quantity);
-    const total = invoice.total.minus(credit);
-    const paid = invoice.payments.reduce((sum, p) => sum.plus(p.amount), total.mul(0));
-    await tx.invoice.update({
-      where: { id: invoice.id },
-      data: {
-        total,
-        subtotal: { decrement: credit },
-        status: paid.gte(total) ? "PAID" : paid.gt(0) ? "PARTIALLY_PAID" : "UNPAID",
-        items: {
-          create: {
-            description: "Medicine return · " + data.reason,
-            quantity: -data.quantity,
-            unitPrice: original.unitPrice,
-            amount: credit.neg(),
-          },
-        },
-      },
-    });
-    await tx.dispensing.update({ where: { id: fill.id }, data: { returned: { increment: data.quantity } } });
-    const restock = form.get("restock") === "on";
-    if (restock)
-      await tx.pharmacyBatch.update({
-        where: { id: fill.batchId },
-        data: { quantity: { increment: data.quantity } },
-      });
-    await tx.activityLog.create({
-      data: {
-        userId: actor.id,
-        action: "RETURN",
-        entityType: "Dispensing",
-        entityId: fill.id,
-        description: data.reason,
-        metadata: { quantity: data.quantity, restock },
-      },
-    });
-  });
+  const data = z.object({ fillId: field, quantity, reason: field, expectedReturned: z.coerce.number().int().min(0) }).parse(Object.fromEntries(form));
+  await returnDispensedStock({ ...data, restock: form.get("restock") === "on" }, actor.id);
   revalidatePath("/pharmacy");
   revalidatePath("/billing/invoices");
 }
