@@ -179,6 +179,7 @@ model UserPermission {
 }
 
 model User {
+  emergencyCases EmergencyCase[]
   branchMemberships BranchMembership[]
   doctorProfile DoctorProfile?
   admissions    Admission[]
@@ -210,6 +211,7 @@ model User {
   invoicesAsDentist    Invoice[]         @relation("InvoiceDentist")
   createdInvoices      Invoice[]         @relation("InvoiceCreatedBy")
   receivedPayments     Payment[]         @relation("PaymentReceivedBy")
+  cashierShifts CashierShift[]
   addedExpenses        Expense[]         @relation("ExpenseAddedBy")
   uploadedDocuments    Document[]        @relation("DocumentUploadedBy")
   notifications        Notification[]
@@ -241,6 +243,10 @@ model Session {
 // ---------------------------------------------------------------------------
 
 model Patient {
+  serviceCharges ServiceCharge[]
+  emergencyCases EmergencyCase[]
+  followUps FollowUp[]
+  reminderConsent Boolean @default(false)
   guardianAlerts RevenueAlert[]
   branches PatientBranch[]
   archivedAt            DateTime?
@@ -336,6 +342,7 @@ model DentalCondition {
 // ---------------------------------------------------------------------------
 
 model Appointment {
+  emergencyCase EmergencyCase?
   branch Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
   branchId String @default(dbgenerated("hospital_current_branch()"))
   @@index([branchId])
@@ -523,6 +530,7 @@ model Invoice {
 }
 
 model InvoiceItem {
+  serviceCharge ServiceCharge?
   branch Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
   branchId String @default(dbgenerated("hospital_current_branch()"))
   @@index([branchId])
@@ -538,6 +546,8 @@ model InvoiceItem {
 }
 
 model Payment {
+  cashierShiftId String?
+  cashierShift CashierShift? @relation(fields:[cashierShiftId], references:[id], onDelete:Restrict)
   branch Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
   branchId String @default(dbgenerated("hospital_current_branch()"))
   @@index([branchId])
@@ -557,6 +567,32 @@ model Payment {
   @@unique([invoiceId, requestId])
   @@index([invoiceId])
   @@index([patientId])
+}
+
+enum CashierShiftStatus {
+ OPEN
+ SUBMITTED
+ APPROVED
+}
+
+model CashierShift {
+ id String @id @default(cuid())
+ branchId String @default(dbgenerated("hospital_current_branch()"))
+ branch Branch @relation(fields:[branchId], references:[id], onDelete:Restrict)
+ cashierId String
+ cashier User @relation(fields:[cashierId], references:[id], onDelete:Restrict)
+ openingCash Decimal @db.Decimal(10,2)
+ countedCash Decimal? @db.Decimal(10,2)
+ expectedCash Decimal? @db.Decimal(10,2)
+ discrepancy Decimal? @db.Decimal(10,2)
+ status CashierShiftStatus @default(OPEN)
+ openedAt DateTime @default(now())
+ submittedAt DateTime?
+ approvedAt DateTime?
+ approvedById String?
+ payments Payment[]
+ @@index([branchId,status,openedAt])
+ @@index([cashierId,openedAt])
 }
 
 // ---------------------------------------------------------------------------
@@ -693,6 +729,7 @@ model Encounter {
 }
 
 model ClinicalNote {
+  followUpTask FollowUp?
   branch Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
   branchId String @default(dbgenerated("hospital_current_branch()"))
   @@index([branchId])
@@ -796,6 +833,7 @@ model Bed {
 }
 
 model Admission {
+  emergencyCase EmergencyCase?
   branch Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
   branchId String @default(dbgenerated("hospital_current_branch()"))
   @@index([branchId])
@@ -895,6 +933,11 @@ model BedStay {
 }
 
 model Branch {
+  serviceCharges ServiceCharge[]
+  emergencyCases EmergencyCase[]
+  triageCategories TriageCategory[]
+  cashierShifts CashierShift[]
+  followUps FollowUp[]
   guardianAlerts RevenueAlert[]
   appointmentRows Appointment[]
   appointmentRequestRows AppointmentRequest[]
@@ -931,6 +974,7 @@ model Branch {
 }
 
 model Service {
+  serviceCharges ServiceCharge[]
   branch Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
   branchId String @default(dbgenerated("hospital_current_branch()"))
   @@index([branchId])
@@ -942,6 +986,35 @@ model Service {
   department   Department @relation(fields: [departmentId], references: [id], onDelete: Restrict)
   active       Boolean    @default(true)
   @@unique([branchId, name])
+}
+
+enum ServiceChargeState {
+ PENDING
+ POSTED
+ VOIDED
+}
+
+model ServiceCharge {
+ id String @id @default(cuid())
+ branchId String @default(dbgenerated("hospital_current_branch()"))
+ branch Branch @relation(fields:[branchId],references:[id],onDelete:Restrict)
+ patientId String
+ patient Patient @relation(fields:[patientId],references:[id],onDelete:Restrict)
+ serviceId String
+ service Service @relation(fields:[serviceId],references:[id],onDelete:Restrict)
+ quantity Int
+ unitPrice Decimal @db.Decimal(10,2)
+ amount Decimal @db.Decimal(10,2)
+ status ServiceChargeState @default(PENDING)
+ invoiceItemId String? @unique
+ invoiceItem InvoiceItem? @relation(fields:[invoiceItemId],references:[id],onDelete:Restrict)
+ createdById String
+ createdAt DateTime @default(now())
+ postedAt DateTime?
+ voidedAt DateTime?
+ voidReason String?
+ @@index([branchId,status,createdAt])
+ @@index([patientId,status])
 }
 
 model BranchMembership {
@@ -989,4 +1062,73 @@ model RevenueAlert {
   updatedAt DateTime @updatedAt
   @@unique([branchId,rule,sourceId])
   @@index([branchId,status,createdAt])
+}
+
+enum FollowUpState {
+ DUE
+ BOOKED
+ COMPLETED
+ OPTED_OUT
+ CANCELLED
+}
+model FollowUp {
+ id String @id @default(cuid())
+ branchId String @default(dbgenerated("hospital_current_branch()"))
+ branch Branch @relation(fields:[branchId], references:[id], onDelete:Restrict)
+ patientId String
+ patient Patient @relation(fields:[patientId], references:[id], onDelete:Restrict)
+ noteId String @unique
+ note ClinicalNote @relation(fields:[noteId], references:[id], onDelete:Restrict)
+ dueDate DateTime @db.Date
+ status FollowUpState @default(DUE)
+ reminderSentAt DateTime?
+ createdAt DateTime @default(now())
+ updatedAt DateTime @updatedAt
+ @@index([branchId,status,dueDate])
+}
+
+enum EmergencyState {
+ REGISTERED
+ TRIAGED
+ OPD_TRANSFERRED
+ IPD_TRANSFERRED
+ CLOSED
+}
+
+model TriageCategory {
+ id String @id @default(cuid())
+ branchId String @default(dbgenerated("hospital_current_branch()"))
+ branch Branch @relation(fields:[branchId],references:[id],onDelete:Restrict)
+ name String
+ priority Int
+ color String
+ escalationRule String?
+ active Boolean @default(false)
+ emergencyCases EmergencyCase[]
+ @@unique([branchId,name])
+ @@index([branchId,active,priority])
+}
+
+model EmergencyCase {
+ id String @id @default(cuid())
+ branchId String @default(dbgenerated("hospital_current_branch()"))
+ branch Branch @relation(fields:[branchId],references:[id],onDelete:Restrict)
+ patientId String
+ patient Patient @relation(fields:[patientId],references:[id],onDelete:Restrict)
+ clinicianId String?
+ clinician User? @relation(fields:[clinicianId],references:[id],onDelete:Restrict)
+ categoryId String?
+ category TriageCategory? @relation(fields:[categoryId],references:[id],onDelete:Restrict)
+ status EmergencyState @default(REGISTERED)
+ presentingConcern String
+ recordedById String
+ registeredAt DateTime @default(now())
+ triagedAt DateTime?
+ appointmentId String? @unique
+ appointment Appointment? @relation(fields:[appointmentId],references:[id],onDelete:Restrict)
+ admissionId String? @unique
+ admission Admission? @relation(fields:[admissionId],references:[id],onDelete:Restrict)
+ closedAt DateTime?
+ @@index([branchId,status,registeredAt])
+ @@index([patientId,registeredAt])
 }

@@ -23,3 +23,13 @@ Baseline audit and 21-group parity matrix: [audit.md](audit.md). No live clinica
 Punjab-specific obligations must be checked with the operator and qualified reviewers against the [Punjab Healthcare Commission licensing guidance](https://os.phc.org.pk/licensingIntro.aspx) and [Minimum Service Delivery Standards](https://os.phc.org.pk/msdsImplimentation.aspx). This repository does not claim certification.
 
 Current financial guard: until hospital thresholds and approval workflow are signed off, only explicitly authorized Admin/Super Admin accounts can post discretionary invoice discounts or refunds.
+
+## Current 1–5 workstream (2026-11-24)
+
+- **1 Revenue Guardian — partial:** Added draft amount/percentage thresholds, same-branch permission-checked reviewer assignment, activity history, duplicate treatment-charge detection, completed service-charge detection, and return-aware pharmacy reconciliation. Released-lab, service-charge, duplicate-treatment, unauthorized-discount, repeat-scan and reviewer-role tests pass. Threshold activation still awaits operator approval; full UI review and all source types need broader acceptance coverage.
+- **2 Billing/cashier — partial:** Added recorded service charges with consolidated posting to one invoice, administrator-only pending-charge void, cashier shifts with payment linkage and cash discrepancy calculation, administrator close approval and printable payment receipts. Cashier transaction test passes. Separate discount/refund requests and approvals, posted-invoice void policy, comprehensive day-end review and consolidated OPD/IPD/lab/pharmacy settlement remain open.
+- **3 Emergency — partial:** Added emergency cases linked to central patients, clinician assignment, state changes, and transfer links to checked-in OPD visits or active admissions. Triage categories and escalation instructions are draft only, with no approved categories or live clinical activation. Clinician workflow validation and direct handoff acceptance remain open.
+- **4 Waiting board — functional baseline:** Public token/doctor/department/status board polls every 10 seconds. HTTP 200 and JSON have no patient identifiers; browser route renders. Multi-branch display configuration and device-level usability testing remain open.
+- **5 Follow-ups — partial:** Clinical notes now create due tasks; status, consent/opt-out and manually generated internal reminders are stored and audited. Appointment linkage, automated reminder scheduling and cross-role acceptance remain open.
+
+All four migrations in this workstream are additive and applied only to the dedicated `hospital_management_mvp` development database. The branch remains **NO-GO** for live patient care or financial use.

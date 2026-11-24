@@ -71,7 +71,9 @@ export async function recordPaymentAction(_prev: PaymentFormState, formData: For
   const request = z.uuid().safeParse(formData.get("requestId"));
   if (!request.success) return { error: "Reopen the payment form before submitting." };
 
-  const result = await postInvoicePayment({ ...data, requestId: request.data }, user);
+  let result;
+  try { result = await postInvoicePayment({ ...data, requestId: request.data }, user); }
+  catch(error) { return { error: error instanceof Error ? error.message : "Payment could not be posted." }; }
   if (!result.invoice) return { error: result.error };
   const { invoice } = result;
 
@@ -94,7 +96,9 @@ export async function refundPayment(form: FormData): Promise<PaymentFormState> {
     method: paymentSchema.shape.method,
   }).safeParse(Object.fromEntries(form));
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the refund details." };
-  const result = await postInvoiceRefund(parsed.data, actor.id);
+  let result;
+  try { result = await postInvoiceRefund(parsed.data, actor.id); }
+  catch(error) { return { error: error instanceof Error ? error.message : "Refund could not be posted." }; }
   if (!result.patientId) return { error: result.error };
   revalidatePath("/billing/invoices/" + parsed.data.invoiceId);
   revalidatePath("/billing/invoices");

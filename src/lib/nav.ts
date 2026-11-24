@@ -59,6 +59,8 @@ export const NAV_ITEMS: NavItem[] = [
     ],
   },
   { title: "Appointments", href: "/appointments", icon: CalendarDays, permission: "appointments.view" },
+  { title: "Follow-ups", href: "/follow-ups", icon: CalendarDays, permission: "appointments.view" },
+  { title: "Emergency", href: "/emergency", icon: Stethoscope, permission: "emergency.view" },
   { title: "Pharmacy", href: "/pharmacy", icon: Pill, permission: "pharmacy.view" },
   { title: "Laboratory", href: "/laboratory", icon: Stethoscope, permission: "lab.view" },
   { title: "Admissions and beds", href: "/admissions", icon: Stethoscope, permission: "ipd.view" },
@@ -73,7 +75,9 @@ export const NAV_ITEMS: NavItem[] = [
     permission: "billing.view",
     children: [
       { title: "Invoices", href: "/billing/invoices", icon: FileText },
+      { title: "Service charges", href: "/billing/service-charges", icon: Receipt, permission: "billing.create" },
       { title: "Payments", href: "/billing/payments", icon: CreditCard },
+      { title: "Cashier shifts", href: "/billing/shifts", icon: CreditCard, permission: "billing.shifts" },
       { title: "Revenue Guardian", href: "/billing/guardian", icon: Receipt, permission: "billing.guardian" },
     ],
   },

@@ -31,6 +31,12 @@ type ActionDef = { action: string; label: string; description: string };
 
 /** Modules, the actions each one supports, and what each action controls. */
 export const PERMISSION_CATALOG = [
+  { module: "emergency", label: "Emergency", actions: [
+    { action: "view", label: "View", description: "View assigned emergency cases." },
+    { action: "create", label: "Register", description: "Register an emergency case for a patient." },
+    { action: "edit", label: "Update", description: "Assign clinician, record approved triage and transfer." },
+    { action: "manage", label: "Configure", description: "Configure draft triage categories." },
+  ] },
   { module: "pharmacy", label: "Pharmacy", actions: [
     { action: "view", label: "View", description: "Read stock and pending prescriptions." },
     { action: "edit", label: "Dispense", description: "Dispense prescribed medicines and create charges." },
@@ -116,6 +122,8 @@ export const PERMISSION_CATALOG = [
       { action: "refund", label: "Refund", description: "Post an auditable refund against a received payment." },
       { action: "discount", label: "Discount", description: "Authorize invoice discounts." },
       { action: "payments", label: "Record Payment", description: "Record full or partial payments on invoices." },
+      { action: "shifts", label: "Cashier shifts", description: "Open, submit and view own cashier reconciliation." },
+      { action: "shiftApprove", label: "Approve cashier close", description: "Review and approve submitted cashier reconciliation." },
     ],
   },
   {
@@ -189,6 +197,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<BuiltInRole, PermissionKey[]> = {
   // (enforced in the permission and staff actions).
   ADMIN: ALL_PERMISSION_KEYS,
   DENTIST: [
+    ...keys("emergency.view", "emergency.edit"),
     ...keys("opd.view", "opd.edit", "lab.create"),
     ...all("dashboard"),
     ...keys("patients.view", "patients.create", "patients.edit"),
@@ -200,6 +209,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<BuiltInRole, PermissionKey[]> = {
     ...keys("notifications.view", "settings.view"),
   ],
   RECEPTIONIST: [
+    ...keys("emergency.view", "emergency.create"),
     ...all("dashboard"),
     ...keys("patients.view", "patients.create", "patients.edit"),
     ...keys("appointments.view", "appointments.create", "appointments.edit", "appointments.delete", "appointments.requests"),
@@ -208,9 +218,9 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<BuiltInRole, PermissionKey[]> = {
     ...keys("notifications.view", "settings.view"),
   ],
   PHARMACIST: all("pharmacy"),
-  CASHIER: keys("billing.view", "billing.payments", "billing.guardian"),
+  CASHIER: keys("billing.view", "billing.payments", "billing.guardian", "billing.shifts"),
   BILLING_OFFICER: all("billing"),
-  NURSE: keys("ipd.view","ipd.edit"),
+  NURSE: keys("ipd.view","ipd.edit","emergency.view","emergency.edit"),
   DEPARTMENT_MANAGER: keys("settings.view"),
   INVENTORY_MANAGER: keys("pharmacy.view","pharmacy.manage"),
   LAB_TECH: keys("lab.view", "lab.edit", "notifications.view", "settings.view"),

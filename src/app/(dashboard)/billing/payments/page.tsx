@@ -125,6 +125,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Sea
                       <td className="text-foreground/80 px-3 py-3">{p.receivedBy?.name ?? <span className="text-muted-foreground">—</span>}</td>
                       <td className="text-success px-3 py-3 text-right font-semibold tabular-nums">{formatCurrency(toNumber(p.amount))}</td>
                       <td className="py-3 pr-5 pl-3 text-right">
+                        <Link href={`/billing/payments/${p.id}/receipt`} className="mr-2 underline">Receipt</Link>
                         <ViewInvoice id={p.invoiceId} number={p.invoice.invoiceNumber} />
                       </td>
                     </tr>
@@ -150,6 +151,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Sea
                     {formatDateTime(p.date)}
                     {p.receivedBy ? ` · by ${p.receivedBy.name}` : ""}
                   </p>
+                  <Link href={`/billing/payments/${p.id}/receipt`} className="text-sm underline">Receipt</Link>
                 </li>
               ))}
             </ul>

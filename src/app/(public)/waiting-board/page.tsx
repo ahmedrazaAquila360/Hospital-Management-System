@@ -1,0 +1,3 @@
+import {PublicWaitingBoard} from "@/components/appointments/public-waiting-board";
+export const metadata={title:"Waiting board"};
+export default function WaitingBoard(){return <main className="mx-auto max-w-5xl space-y-5 p-6"><h1 className="font-heading text-3xl font-semibold">Waiting board</h1><PublicWaitingBoard/></main>}

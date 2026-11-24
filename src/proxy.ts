@@ -4,7 +4,7 @@ import { SESSION_COOKIE_NAME } from "@/lib/auth/session";
 // Exact-match public paths (no sub-routes).
 const PUBLIC_EXACT_PATHS = ["/"];
 // Public paths that also cover their own sub-routes.
-const PUBLIC_PREFIX_PATHS = ["/login", "/forgot-password", "/book"];
+const PUBLIC_PREFIX_PATHS = ["/login", "/forgot-password", "/book", "/waiting-board"];
 
 function isPublicPath(pathname: string) {
   if (PUBLIC_EXACT_PATHS.includes(pathname)) return true;

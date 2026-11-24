@@ -3,9 +3,10 @@ import { prisma } from "@/lib/prisma";
 import { Prisma } from "@/generated/prisma/client";
 import { formatCurrency } from "@/lib/format";
 import type { PaymentInput } from "@/lib/validations/invoice";
+import {activeCashierShift} from "./cashier-shift";
 
 /** Internal transaction; callers must authenticate and authorize payment collection. */
-export async function postInvoicePayment(data: PaymentInput & { requestId: string }, user: { id: string; name: string }) {
+export async function postInvoicePayment(data: PaymentInput & { requestId: string }, user: { id: string; name: string; role?: {name:string} }) {
   return prisma.$transaction(async tx => {
     await tx.$queryRaw`SELECT id FROM "Invoice" WHERE id = ${data.invoiceId} FOR UPDATE`;
     const invoice = await tx.invoice.findUnique({
@@ -24,6 +25,7 @@ export async function postInvoicePayment(data: PaymentInput & { requestId: strin
     const alreadyPaid = invoice.payments.reduce((sum, p) => sum.plus(p.amount), new Prisma.Decimal(0));
     const remaining = invoice.total.minus(alreadyPaid);
     if (amount.gt(remaining)) return { error: `Amount exceeds the remaining balance of ${remaining.toFixed(2)}.` };
+    const cashierShiftId=await activeCashierShift(tx,user.id,user.role?.name==="CASHIER");
 
     await tx.payment.create({
       data: {
@@ -34,6 +36,7 @@ export async function postInvoicePayment(data: PaymentInput & { requestId: strin
         method: data.method,
         reference: data.reference || null,
         receivedById: user.id,
+        cashierShiftId,
       },
     });
 

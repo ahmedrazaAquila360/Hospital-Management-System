@@ -54,6 +54,12 @@ export async function documentVisit(form: FormData) {
         vitals,
       },
     });
+    if (data.followUp && !reason) {
+      const patientId = visit.appointmentId
+        ? (await tx.appointment.findUniqueOrThrow({where:{id:visit.appointmentId},select:{patientId:true}})).patientId
+        : (await tx.encounter.findUniqueOrThrow({where:{id:data.encounterId},select:{admission:{select:{patientId:true}}}})).admission?.patientId;
+      if(patientId)await tx.followUp.create({data:{patientId,noteId:note.id,dueDate:new Date(data.followUp)}});
+    }
     if (visit.appointmentId)
       await tx.appointment.updateMany({
         where: { id: visit.appointmentId, status: "CHECKED_IN" },

@@ -2,6 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@/generated/prisma/client";
 import type { PaymentMethod } from "@/generated/prisma/enums";
+import {activeCashierShift} from "./cashier-shift";
 
 /** Internal transaction; the action must authorize billing.refund before calling. */
 export async function postInvoiceRefund(data: { invoiceId: string; requestId: string; amount: string; reason: string; method: PaymentMethod }, actorId: string) {
@@ -18,9 +19,10 @@ export async function postInvoiceRefund(data: { invoiceId: string; requestId: st
     }
     const net = invoice.payments.reduce((sum, p) => sum.plus(p.amount), amount);
     if (net.lt(0)) return { error: "Refund exceeds net payments." };
+    const cashierShiftId=await activeCashierShift(tx,actorId,false);
     const refund = await tx.payment.create({ data: {
       invoiceId: invoice.id, patientId: invoice.patientId, requestId: data.requestId,
-      amount, method: data.method, reference: data.reason, receivedById: actorId,
+      amount, method: data.method, reference: data.reason, receivedById: actorId,cashierShiftId,
     } });
     await tx.invoice.update({ where: { id: invoice.id }, data: { status: net.gte(invoice.total) ? "PAID" : net.gt(0) ? "PARTIALLY_PAID" : "UNPAID" } });
     await tx.activityLog.create({ data: { userId: actorId, entityType: "Payment", entityId: refund.id, action: "REFUND", description: data.reason } });
