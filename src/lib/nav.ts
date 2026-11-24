@@ -76,6 +76,7 @@ export const NAV_ITEMS: NavItem[] = [
     children: [
       { title: "Invoices", href: "/billing/invoices", icon: FileText },
       { title: "Service charges", href: "/billing/service-charges", icon: Receipt, permission: "billing.create" },
+      { title: "Financial approvals", href: "/billing/approvals", icon: Receipt, permission: "billing.view" },
       { title: "Payments", href: "/billing/payments", icon: CreditCard },
       { title: "Cashier shifts", href: "/billing/shifts", icon: CreditCard, permission: "billing.shifts" },
       { title: "Revenue Guardian", href: "/billing/guardian", icon: Receipt, permission: "billing.guardian" },

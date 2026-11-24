@@ -6,7 +6,10 @@ import {activeCashierShift} from "./cashier-shift";
 
 /** Internal transaction; the action must authorize billing.refund before calling. */
 export async function postInvoiceRefund(data: { invoiceId: string; requestId: string; amount: string; reason: string; method: PaymentMethod }, actorId: string) {
-  return prisma.$transaction(async tx => {
+  return prisma.$transaction(tx=>applyInvoiceRefund(tx,data,actorId));
+}
+
+export async function applyInvoiceRefund(tx:Prisma.TransactionClient,data: { invoiceId: string; requestId: string; amount: string; reason: string; method: PaymentMethod }, actorId: string) {
     await tx.$queryRaw`SELECT id FROM "Invoice" WHERE id = ${data.invoiceId} FOR UPDATE`;
     const invoice = await tx.invoice.findUnique({ where: { id: data.invoiceId }, include: { payments: true } });
     if (!invoice) return { error: "Invoice not found." };
@@ -15,7 +18,7 @@ export async function postInvoiceRefund(data: { invoiceId: string; requestId: st
     if (prior) {
       if (!prior.amount.equals(amount) || prior.method !== data.method || prior.reference !== data.reason)
         return { error: "This submission was already used with different details. Reload before recording a new refund." };
-      return { patientId: invoice.patientId };
+      return { patientId: invoice.patientId,paymentId:prior.id };
     }
     const net = invoice.payments.reduce((sum, p) => sum.plus(p.amount), amount);
     if (net.lt(0)) return { error: "Refund exceeds net payments." };
@@ -26,6 +29,5 @@ export async function postInvoiceRefund(data: { invoiceId: string; requestId: st
     } });
     await tx.invoice.update({ where: { id: invoice.id }, data: { status: net.gte(invoice.total) ? "PAID" : net.gt(0) ? "PARTIALLY_PAID" : "UNPAID" } });
     await tx.activityLog.create({ data: { userId: actorId, entityType: "Payment", entityId: refund.id, action: "REFUND", description: data.reason } });
-    return { patientId: invoice.patientId };
-  });
+    return { patientId: invoice.patientId,paymentId:refund.id };
 }

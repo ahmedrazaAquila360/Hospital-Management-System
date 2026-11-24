@@ -90,6 +90,9 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
             </Link>
           </Button>
           <Button asChild variant="outline" size="lg" className="rounded-xl">
+            <Link href={`/billing/patients/${invoice.patientId}/statement`} target="_blank" rel="noopener noreferrer">Patient statement</Link>
+          </Button>
+          <Button asChild variant="outline" size="lg" className="rounded-xl">
             <a href={`/api/invoices/${invoice.id}/pdf`} download={`${invoice.invoiceNumber}.pdf`}>
               <Download /> Download PDF
             </a>

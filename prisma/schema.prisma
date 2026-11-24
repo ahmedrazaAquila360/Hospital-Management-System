@@ -342,6 +342,7 @@ model DentalCondition {
 // ---------------------------------------------------------------------------
 
 model Appointment {
+  followUpTask FollowUp?
   emergencyCase EmergencyCase?
   branch Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
   branchId String @default(dbgenerated("hospital_current_branch()"))
@@ -496,6 +497,7 @@ model PrescriptionMedicine {
 // ---------------------------------------------------------------------------
 
 model Invoice {
+  approvalRequests FinancialApproval[]
   requestId String?
   requestHash String?
   authorization Json?
@@ -933,6 +935,7 @@ model BedStay {
 }
 
 model Branch {
+  financialApprovals FinancialApproval[]
   serviceCharges ServiceCharge[]
   emergencyCases EmergencyCase[]
   triageCategories TriageCategory[]
@@ -1017,6 +1020,36 @@ model ServiceCharge {
  @@index([patientId,status])
 }
 
+enum FinancialApprovalKind {
+ DISCOUNT
+ REFUND
+}
+enum FinancialApprovalState {
+ REQUESTED
+ APPLIED
+ REJECTED
+}
+model FinancialApproval {
+ id String @id @default(cuid())
+ branchId String @default(dbgenerated("hospital_current_branch()"))
+ branch Branch @relation(fields:[branchId],references:[id],onDelete:Restrict)
+ invoiceId String
+ invoice Invoice @relation(fields:[invoiceId],references:[id],onDelete:Restrict)
+ kind FinancialApprovalKind
+ status FinancialApprovalState @default(REQUESTED)
+ amount Decimal @db.Decimal(10,2)
+ method PaymentMethod?
+ reason String
+ requestedById String
+ requestedAt DateTime @default(now())
+ decidedById String?
+ decidedAt DateTime?
+ decisionReason String?
+ appliedPaymentId String?
+ @@index([branchId,status,requestedAt])
+ @@index([invoiceId,status])
+}
+
 model BranchMembership {
   active Boolean @default(true)
   branch Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
@@ -1079,6 +1112,8 @@ model FollowUp {
  patient Patient @relation(fields:[patientId], references:[id], onDelete:Restrict)
  noteId String @unique
  note ClinicalNote @relation(fields:[noteId], references:[id], onDelete:Restrict)
+ appointmentId String? @unique
+ appointment Appointment? @relation(fields:[appointmentId],references:[id],onDelete:Restrict)
  dueDate DateTime @db.Date
  status FollowUpState @default(DUE)
  reminderSentAt DateTime?

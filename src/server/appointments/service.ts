@@ -28,6 +28,11 @@ async function lockSchedules(tx: Prisma.TransactionClient, ids: string[]) {
   for (const id of [...new Set(ids)].sort()) await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${"appointment-doctor:" + id}, 0))::text`;
 }
 
+async function linkUniqueDueFollowUp(tx:Prisma.TransactionClient,appointmentId:string,patientId:string,date:string){
+  const matches=await tx.followUp.findMany({where:{patientId,dueDate:new Date(date),status:"DUE",appointmentId:null},select:{id:true},take:2});
+  if(matches.length===1)await tx.followUp.update({where:{id:matches[0].id},data:{appointmentId,status:"BOOKED"}});
+}
+
 function parseForm(formData: FormData) {
   return appointmentSchema.safeParse({
     patientId: formData.get("patientId"),
@@ -103,6 +108,7 @@ export async function createAppointment(user: SessionUser, _prev: AppointmentFor
         createdById: user.id,
       },
     });
+    if(data.type==="FOLLOW_UP")await linkUniqueDueFollowUp(tx,appointment.id,data.patientId,data.date);
 
     await tx.notification.create({
       data: {
@@ -143,7 +149,7 @@ export async function updateAppointment(
 
   // Only a changed date or time is checked, so editing the notes of an appointment booked
   // before the hours changed still works.
-  const existing = await prisma.appointment.findUnique({ where: { id, ...(requiresPatientAssignment(user) && { dentistId: user.id }) }, select: { status: true, startTime: true, endTime: true, encounter: { select: { id: true } }, patientId: true, dentistId: true, departmentId: true } });
+  const existing = await prisma.appointment.findUnique({ where: { id, ...(requiresPatientAssignment(user) && { dentistId: user.id }) }, select: { status: true, startTime: true, endTime: true, encounter: { select: { id: true } }, patientId: true, dentistId: true, departmentId: true, type:true,followUpTask:{select:{id:true}} } });
   if (!existing) return { error: "Appointment unavailable." };
   if (existing.encounter || ["COMPLETED", "CANCELLED"].includes(existing.status)) return { error: "Historical visits cannot be overwritten. Use clinical amendments or book a new appointment." };
   if (existing?.encounter && (existing.patientId !== data.patientId || existing.dentistId !== data.dentistId)) return { error: "The patient and doctor are fixed after check-in." };
@@ -173,6 +179,8 @@ export async function updateAppointment(
     },
     include: { patient: true },
   });
+  if(existing.followUpTask&&(data.type!=="FOLLOW_UP"||existing.patientId!==data.patientId))await tx.followUp.update({where:{id:existing.followUpTask.id},data:{status:"DUE",appointmentId:null,reminderSentAt:null}});
+  if(data.type==="FOLLOW_UP"&&(!existing.followUpTask||existing.patientId!==data.patientId))await linkUniqueDueFollowUp(tx,id,data.patientId,data.date);
 
   await tx.activityLog.create({
     data: {
@@ -234,10 +242,12 @@ export async function updateAppointmentStatus(user: SessionUser, id: string, sta
       });
     }
     if (status === "COMPLETED") {
+      await tx.followUp.updateMany({where:{appointmentId:id,status:"BOOKED"},data:{status:"COMPLETED"}});
       const profile = await tx.doctorProfile.findUnique({ where: { userId: appointment.dentistId } });
       if (profile) await invoiceService(tx, "OPD-" + id, appointment.patientId, appointment.dentistId, user.id, "Outpatient consultation", profile.consultationFee);
     }
     if (status === "CHECKED_IN") await tx.encounter.create({ data: { appointmentId: id } });
+    if(status==="CANCELLED"||status==="NO_SHOW")await tx.followUp.updateMany({where:{appointmentId:id,status:"BOOKED"},data:{status:"DUE",appointmentId:null,reminderSentAt:null}});
     return appointment;
   });
   return { ok: true };

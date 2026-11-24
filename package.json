@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "prisma generate && next build --webpack",
     "start": "next start",
+    "reminders:follow-ups": "NODE_OPTIONS=--conditions=react-server tsx scripts/follow-up-reminders.ts",
     "lint": "eslint",
     "model:fetch": "node scripts/fetch-bodyparts3d.mjs",
     "model:build": "tsx scripts/build-bodyparts3d-dentition.mts",

@@ -14,7 +14,7 @@ export async function scanRevenueGuardian(actorId:string){
   prisma.labOrder.findMany({where:{status:"RELEASED"},include:{encounter:{include:{appointment:true,admission:true}}}}),
   prisma.appointment.findMany({where:{status:"COMPLETED",type:"CONSULTATION"},include:{dentist:{include:{doctorProfile:true}}}}),
   prisma.dispensing.findMany({include:{invoice:{include:{items:true}},batch:{include:{medication:true}},medicine:{include:{prescription:true}}}}),
-  prisma.invoice.findMany({where:{OR:[{discount:{gt:0}},{payments:{some:{amount:{lt:0}}}}]},include:{payments:true}}),
+  prisma.invoice.findMany({where:{OR:[{discount:{gt:0}},{payments:{some:{amount:{lt:0}}}}]},include:{payments:true,approvalRequests:{where:{status:"APPLIED"}}}}),
   prisma.admission.findMany({where:{status:"DISCHARGED"},select:{id:true,number:true,patientId:true}}),
   prisma.serviceCharge.findMany({where:{status:{in:["PENDING","POSTED"]}},include:{service:{select:{name:true}}}}),
  ]);
@@ -47,11 +47,14 @@ export async function scanRevenueGuardian(actorId:string){
  }
  for(const invoice of invoices){
   if(invoice.discount.gt(0)){
-   const auth=invoice.authorization as {discountPermission?:boolean}|null;
-   if(!auth?.discountPermission || (config.approvedByOperator && ((config.discountAmount!==null && invoice.discount.gt(config.discountAmount)) || (config.discountPercent!==null && invoice.subtotal.gt(0) && invoice.discount.div(invoice.subtotal).mul(100).gt(config.discountPercent)))))candidates.push({rule:"DISCOUNT_REVIEW",sourceId:invoice.id,patientId:invoice.patientId,evidence:{invoiceNumber:invoice.invoiceNumber,discount:money(invoice.discount),authorizationRecorded:!!invoice.authorization},impact:invoice.discount,severity:"MEDIUM"});
+   const auth=invoice.authorization as {discountPermission?:boolean;discount?:string}|null;
+   const initial=auth?.discountPermission?new Prisma.Decimal(auth.discount??0):new Prisma.Decimal(0);
+   const approved=invoice.approvalRequests.filter(a=>a.kind==="DISCOUNT").reduce((sum,a)=>sum.plus(a.amount),initial);
+   if(approved.lt(invoice.discount) || (config.approvedByOperator && ((config.discountAmount!==null && invoice.discount.gt(config.discountAmount)) || (config.discountPercent!==null && invoice.subtotal.gt(0) && invoice.discount.div(invoice.subtotal).mul(100).gt(config.discountPercent)))))candidates.push({rule:"DISCOUNT_REVIEW",sourceId:invoice.id,patientId:invoice.patientId,evidence:{invoiceNumber:invoice.invoiceNumber,discount:money(invoice.discount),authorizedAmount:money(approved)},impact:invoice.discount.minus(approved).gt(0)?invoice.discount.minus(approved):invoice.discount,severity:"MEDIUM"});
   }
   for(const refund of invoice.payments.filter(p=>p.amount.lt(0))){
-   if(!config.approvedByOperator || config.refundAmount===null || refund.amount.abs().gt(config.refundAmount))candidates.push({rule:"REFUND_REVIEW",sourceId:refund.id,patientId:invoice.patientId,evidence:{invoiceId:invoice.id,refundAmount:money(refund.amount.abs()),reasonRecorded:!!refund.reference},impact:refund.amount.abs(),severity:"MEDIUM"});
+   const approved=invoice.approvalRequests.some(a=>a.kind==="REFUND"&&a.appliedPaymentId===refund.id);
+   if(!approved || (config.approvedByOperator && config.refundAmount!==null && refund.amount.abs().gt(config.refundAmount)))candidates.push({rule:"REFUND_REVIEW",sourceId:refund.id,patientId:invoice.patientId,evidence:{invoiceId:invoice.id,refundAmount:money(refund.amount.abs()),reasonRecorded:!!refund.reference,approvalRecorded:approved},impact:refund.amount.abs(),severity:"MEDIUM"});
   }
  }
  for(const admission of admissions){
