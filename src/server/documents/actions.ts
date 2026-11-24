@@ -10,8 +10,8 @@ import { documentUploadSchema } from "@/lib/validations/document";
 import {
   createDocumentUpload,
   deleteDocumentObject,
-  headDocument,
-  isDocumentKey,
+  finalizeDocumentUpload,
+  isOwnedStagingKey,
   isR2Configured,
   r2KeyFromFileUrl,
   R2_URL_PREFIX,
@@ -41,7 +41,7 @@ export async function createDocumentUploadAction(file: { name: string; size: num
   const problem = fileProblem(file.size, file.type);
   if (problem) return { error: problem };
   if (!isR2Configured()) return { direct: false };
-  return { direct: true, ...(await createDocumentUpload(file.name, file.type)) };
+  return { direct: true, ...(await createDocumentUpload(file.name, file.type, user.id)) };
 }
 
 export async function uploadDocumentAction(_prev: DocumentUploadState, formData: FormData): Promise<DocumentUploadState> {
@@ -55,15 +55,12 @@ export async function uploadDocumentAction(_prev: DocumentUploadState, formData:
   let upload: { fileUrl?: string; size: number; type: string; name: string };
 
   if (typeof fileKey === "string" && fileKey) {
-    if (!isR2Configured() || !isDocumentKey(fileKey)) return { error: "Upload failed. Please try again." };
-    const head = await headDocument(fileKey);
-    if (!head) return { error: "Upload failed. Please try again." };
-    const problem = fileProblem(head.size, head.contentType);
-    if (problem) {
-      await deleteDocumentObject(fileKey);
-      return { error: problem };
-    }
-    upload = { fileUrl: `${R2_URL_PREFIX}${fileKey}`, size: head.size, type: head.contentType, name: String(formData.get("fileName") ?? "") };
+    if (!isR2Configured() || !isOwnedStagingKey(fileKey, user.id)) return { error: "Upload failed. Please try again." };
+    try {
+      const saved = await finalizeDocumentUpload(fileKey, user.id);
+      upload = { fileUrl: `${R2_URL_PREFIX}${saved.key}`, size: saved.size, type: saved.contentType, name: String(formData.get("fileName") ?? "") };
+    } catch { return { error: "The upload is invalid or its contents do not match its file type." }; }
+
   } else {
     if (!(file instanceof File)) return { error: "Please choose a file to upload." };
     const problem = fileProblem(file.size, file.type);

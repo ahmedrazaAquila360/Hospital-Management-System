@@ -58,7 +58,10 @@ export async function changePasswordAction(_prev: SettingsFormState, formData: F
   if (!valid) return { error: "Current password is incorrect." };
 
   const passwordHash = await hashPassword(parsed.data.newPassword);
-  await prisma.user.update({ where: { id: user.id }, data: { passwordHash } });
+  await prisma.$transaction([
+    prisma.user.update({ where: { id: user.id }, data: { passwordHash } }),
+    prisma.session.deleteMany({ where: { userId: user.id } }),
+  ]);
 
   return { success: true };
 }

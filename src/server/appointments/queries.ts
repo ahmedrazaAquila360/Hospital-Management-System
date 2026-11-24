@@ -1,4 +1,5 @@
 import "server-only";
+import { can } from "@/lib/permissions";
 import { requireUser } from "@/lib/auth/guard";
 import { patientScope } from "@/server/patients/access";
 import { prisma } from "@/lib/prisma";
@@ -34,8 +35,8 @@ export async function getAppointmentById(id: string) {
       dentist: true,
       encounter: { select: { id: true, token: true } },
       createdBy: true,
-      treatments: true,
-      prescriptions: { include: { medicines: true } },
+      treatments: { where: can(actor,"treatments.view") ? {} : { id: { in: [] } } },
+      prescriptions: { where: can(actor,"prescriptions.view") ? {} : { id: { in: [] } }, include: { medicines: true } },
     },
   });
 }
@@ -43,7 +44,7 @@ export async function getAppointmentById(id: string) {
 export async function getDentists() {
   const role = await prisma.role.findUnique({ where: { name: "DENTIST" } });
   if (!role) return [];
-  return prisma.user.findMany({ where: { roleId: role.id, status: "ACTIVE" }, orderBy: { name: "asc" } });
+  return prisma.user.findMany({ where: { roleId: role.id, status: "ACTIVE" }, select: { id: true, name: true }, orderBy: { name: "asc" } });
 }
 
 export async function searchPatientsForSelect(query: string) {

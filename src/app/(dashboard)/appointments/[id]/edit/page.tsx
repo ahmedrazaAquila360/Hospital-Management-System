@@ -1,3 +1,5 @@
+import { appointmentClock } from "@/lib/appointment-clock";
+import { hospitalZone } from "@/server/reports/calendar";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { CalendarClock } from "lucide-react";
@@ -12,13 +14,13 @@ import { ToothOutline } from "@/components/brand/brand-logo";
 export const metadata: Metadata = { title: "Edit Appointment" };
 
 /** HH:mm on the server's clock: the same clock the booking action used to save the time. */
-function clockTime(date: Date) {
-  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
-}
+
 
 export default async function EditAppointmentPage({ params }: { params: Promise<{ id: string }> }) {
   await requirePermission("appointments.edit");
   const { id } = await params;
+  const zone = await hospitalZone();
+  const clockTime = (date: Date) => appointmentClock(date, zone);
   const [appointment, dentists, workingHours] = await Promise.all([getAppointmentById(id), getDentists(), getWorkingHours()]);
   if (!appointment) notFound();
 

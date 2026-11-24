@@ -73,7 +73,8 @@ export async function getTreatmentById(id: string) {
 
 /** Read-only totals for the Treatments summary cards. */
 export async function getTreatmentCounts() {
-  const grouped = await prisma.treatment.groupBy({ by: ["status"], _count: { _all: true } });
+  const actor = await requireUser();
+  const grouped = await prisma.treatment.groupBy({ where: { patient: patientScope(actor) }, by: ["status"], _count: { _all: true } });
   const count = (status: TreatmentStatus) => grouped.find((g) => g.status === status)?._count._all ?? 0;
   const total = grouped.reduce((sum, g) => sum + g._count._all, 0);
   return { total, planned: count("PLANNED"), inProgress: count("IN_PROGRESS"), completed: count("COMPLETED"), cancelled: count("CANCELLED") };

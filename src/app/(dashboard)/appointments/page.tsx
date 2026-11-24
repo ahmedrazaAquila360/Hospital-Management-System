@@ -1,3 +1,5 @@
+import { hospitalZone } from "@/server/reports/calendar";
+import { calendarDay } from "@/lib/report-calendar";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { CalendarDays, Inbox, Plus } from "lucide-react";
@@ -31,7 +33,8 @@ export default async function AppointmentsPage({ searchParams }: { searchParams:
   const canRequests = can(user, "appointments.requests");
 
   const view = (["day", "week", "month"].includes(params.view ?? "") ? params.view : "week") as CalendarView;
-  const date = parseDateParam(params.date);
+  const zone = await hospitalZone();
+  const date = parseDateParam(params.date ?? calendarDay(zone));
   const { start, end } = getRangeForView(view, date);
   // An unknown status would reach Prisma as an invalid enum and fail the page.
   const status = APPOINTMENT_STATUSES.find((s) => s === params.status) as AppointmentStatus | undefined;
@@ -43,7 +46,7 @@ export default async function AppointmentsPage({ searchParams }: { searchParams:
     getWorkingHours(),
   ]);
   const dentists = dentistUsers.map((d) => ({ id: d.id, name: d.name }));
-  const events = toCalendarEvents(appointments.filter((a) => matchesQuery(a, params.q ?? "")));
+  const events = toCalendarEvents(appointments.filter((a) => matchesQuery(a, params.q ?? "")), zone);
 
   const days =
     view === "day" ? [date] : view === "week" ? Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(date), i)) : [];

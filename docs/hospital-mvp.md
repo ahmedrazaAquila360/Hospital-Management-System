@@ -141,3 +141,11 @@ Run `RUN_HOSPITAL_TRANSACTION_TESTS=1 NODE_OPTIONS='--conditions=react-server' p
 These checks replace the previously outstanding inpatient transaction contention checks for these scenarios. They do not establish complete clinical-pilot readiness: broader inherited route authorization, branch scoping, medication safety data and remaining feature acceptance still need review.
 
 Final verification for this increment: targeted ESLint, TypeScript through the production build, the production build itself and the inpatient transaction regression suite passed.
+
+## Security and appointment regression follow-up — November 24, 2026
+
+Completed the scoped inherited-route and historical-record review, with details in [security-and-appointment-audit.md](security-and-appointment-audit.md). Central permission checks now deny hard deletion of retained clinical/financial/document records even for administrators. Completed treatments and clinically started appointments cannot be overwritten through legacy edit flows. Doctor summaries and private document/photo access are scoped; billing reads fewer patient fields. Staff role assignment requires permission-administration access, and password changes revoke sessions. R2 finalization validates owned staging uploads and publishes a separate final object; legacy public document URLs are blocked pending migration.
+
+Appointment services now have repeatable database regression coverage for overlapping/concurrent bookings, adjacent slots, schedule hours, rescheduling, cancellation/no-show, check-in, walk-ins, completion billing, patient assignment and rollback. Ordered doctor locks prevent concurrent overlap inserts from deadlocking. Scheduling uses hospital-local instants and rejects invalid dates and nonexistent DST times.
+
+Policy tests, appointment database tests, targeted lint, production build/TypeScript and production-browser permission smoke checks passed. No migration or UI redesign was required. Live R2 deployment verification, broader branch/custom-role scope and clinical-pilot acceptance remain outstanding; this is not a claim of full ERP completion.

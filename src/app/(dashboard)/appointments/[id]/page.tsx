@@ -1,3 +1,5 @@
+import { appointmentClock } from "@/lib/appointment-clock";
+import { hospitalZone } from "@/server/reports/calendar";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import Link from "next/link";
@@ -45,13 +47,13 @@ import type { AppointmentStatus } from "@/generated/prisma/enums";
 export const metadata: Metadata = { title: "Appointment Details" };
 
 /** HH:mm on the server's clock: the same clock the booking action used to save the time. */
-function clockTime(date: Date) {
-  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
-}
+
 
 export default async function AppointmentDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await requirePermission("appointments.view");
   const { id } = await params;
+  const zone = await hospitalZone();
+  const clockTime = (date: Date) => appointmentClock(date, zone);
   const [appointment, activity, workingHours] = await Promise.all([
     getAppointmentById(id),
     prisma.activityLog.findMany({
@@ -130,7 +132,7 @@ export default async function AppointmentDetailPage({ params }: { params: Promis
                 </span>
                 <span className="inline-flex items-center gap-2 tabular-nums">
                   <Clock3 className="text-muted-foreground size-[1.1rem]" aria-hidden />
-                  {formatTime(appointment.startTime)} – {formatTime(appointment.endTime)}
+                  {clockTime(appointment.startTime)} – {clockTime(appointment.endTime)}
                 </span>
                 <StatusBadge
                   status={appointment.status}

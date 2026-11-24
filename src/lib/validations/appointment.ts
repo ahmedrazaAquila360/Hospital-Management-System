@@ -1,3 +1,4 @@
+import { validDay } from "@/lib/report-calendar";
 import { z } from "zod";
 
 export const APPOINTMENT_TYPES = [
@@ -27,9 +28,9 @@ export const appointmentSchema = z
   .object({
     patientId: z.string().min(1, "Select a patient"),
     dentistId: z.string().min(1, "Select a dentist"),
-    date: z.string().min(1, "Select a date"),
-    startTime: z.string().min(1, "Select a start time"),
-    endTime: z.string().min(1, "Select an end time"),
+    date: z.string().refine(validDay, "Select a valid calendar date"),
+    startTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Select a valid start time"),
+    endTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Select a valid end time"),
     type: z.enum(APPOINTMENT_TYPES),
     notes: z.string().optional(),
   })

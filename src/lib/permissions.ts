@@ -231,14 +231,19 @@ export type SessionUser = {
   permissions: string[];
 };
 
+// Clinical and financial records are retained even for administrators.
+export const RETAINED_DELETE_PERMISSIONS = new Set<string>([
+  "appointments.delete", "prescriptions.delete", "treatments.delete", "documents.delete", "expenses.delete",
+]);
+
 export function can(user: Pick<SessionUser, "permissions"> | null | undefined, key: PermissionKey): boolean {
   if (!user) return false;
-  return user.permissions.includes(key);
+  return !RETAINED_DELETE_PERMISSIONS.has(key) && user.permissions.includes(key);
 }
 
 export function canAny(user: Pick<SessionUser, "permissions"> | null | undefined, keys: PermissionKey[]): boolean {
   if (!user) return false;
-  return keys.some((key) => user.permissions.includes(key));
+  return keys.some((key) => can(user, key));
 }
 
 /**

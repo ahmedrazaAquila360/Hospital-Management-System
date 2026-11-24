@@ -126,9 +126,10 @@ export async function updateTreatmentAction(
 
   const existing = await prisma.treatment.findUnique({ where: { id, ...(user.role.name === "DENTIST" && { dentistId: user.id }) } });
   if (!existing) return { error: "Treatment not found." };
+  if (existing.status === "COMPLETED" || existing.patientId !== data.patientId) return { error: "Historical treatment identity and completed records cannot be overwritten. Record a new clinical amendment." };
 
   const treatment = await prisma.treatment.update({
-    where: { id, ...(user.role.name === "DENTIST" && { dentistId: user.id }) },
+    where: { id, status: { not: "COMPLETED" }, ...(user.role.name === "DENTIST" && { dentistId: user.id }) },
     data: {
       patientId: data.patientId,
       dentistId: data.dentistId,
@@ -167,7 +168,7 @@ export async function updateTreatmentStatusAction(id: string, status: TreatmentS
   const user = await requireUser();
   if (!can(user, "treatments.edit")) throw new Error(NO_PERMISSION);
   const treatment = await prisma.treatment.update({
-    where: { id, ...(user.role.name === "DENTIST" && { dentistId: user.id }) },
+    where: { id, status: { not: "COMPLETED" }, ...(user.role.name === "DENTIST" && { dentistId: user.id }) },
     data: { status, completedAt: status === "COMPLETED" ? new Date() : null },
     include: { patient: true, dentist: true },
   });

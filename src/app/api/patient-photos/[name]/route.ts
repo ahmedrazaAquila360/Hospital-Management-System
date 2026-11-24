@@ -1,3 +1,4 @@
+import { patientScope } from "@/server/patients/access";
 import { getSessionUser } from "@/lib/auth/session";
 import { can } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
@@ -10,12 +11,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ nam
   const patient = await prisma.patient.findFirst({
     where: {
       photoUrl: "/api/patient-photos/" + name,
-      ...(user.role.name === "DENTIST" && {
-        OR: [
-          { appointments: { some: { dentistId: user.id } } },
-          { admissions: { some: { doctorId: user.id } } },
-        ],
-      }),
+      AND: [patientScope(user)],
     },
     select: { id: true },
   });

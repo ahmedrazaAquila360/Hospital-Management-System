@@ -4,6 +4,8 @@ import { DEFAULT_PAGE_SIZE } from "@/lib/pagination";
 import { toNumber } from "@/lib/format";
 import type { InvoiceStatus } from "@/generated/prisma/enums";
 
+const billingPatient = { id: true, patientCode: true, fullName: true, email: true, phone: true, address: true } as const;
+
 export const INVOICES_PAGE_SIZE = DEFAULT_PAGE_SIZE;
 
 export type InvoiceFilters = { search?: string; status?: InvoiceStatus; patientId?: string; page?: number; pageSize?: number };
@@ -33,7 +35,7 @@ export async function listInvoices(filters: InvoiceFilters) {
       orderBy: { date: "desc" },
       skip: (page - 1) * pageSize,
       take: pageSize,
-      include: { patient: true, payments: true },
+      include: { patient: { select: billingPatient }, payments: true },
     }),
   ]);
 
@@ -44,10 +46,10 @@ export async function getInvoiceById(id: string) {
   return prisma.invoice.findUnique({
     where: { id },
     include: {
-      patient: true,
+      patient: { select: billingPatient },
       dentist: true,
       createdBy: true,
-      items: { include: { treatment: true } },
+      items: { include: { treatment: { select: { id: true, name: true } } } },
       payments: { orderBy: { date: "desc" }, include: { receivedBy: true } },
     },
   });
@@ -79,7 +81,7 @@ export async function listPayments(filters: { search?: string; page?: number; pa
       orderBy: { date: "desc" },
       skip: (page - 1) * pageSize,
       take: pageSize,
-      include: { patient: true, invoice: true, receivedBy: true },
+      include: { patient: { select: billingPatient }, invoice: true, receivedBy: true },
     }),
   ]);
 

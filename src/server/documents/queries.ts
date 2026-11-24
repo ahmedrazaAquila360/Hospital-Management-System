@@ -37,7 +37,8 @@ export async function listDocuments(filters: DocumentFilters) {
 
 /** Read-only counts for the Documents summary cards. */
 export async function getDocumentStats() {
-  const byType = await prisma.document.groupBy({ by: ["type"], _count: { _all: true } });
+  const actor = await requireUser();
+  const byType = await prisma.document.groupBy({ where: actor.role.name === "DENTIST" ? { patient: patientScope(actor) } : {}, by: ["type"], _count: { _all: true } });
   const count = (t: DocumentType) => byType.find((r) => r.type === t)?._count._all ?? 0;
   const total = byType.reduce((sum, r) => sum + r._count._all, 0);
   return { total, xray: count("XRAY"), report: count("REPORT"), image: count("IMAGE"), other: total - count("XRAY") - count("REPORT") - count("IMAGE") };

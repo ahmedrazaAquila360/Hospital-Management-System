@@ -20,7 +20,7 @@ export const FINAL_STATUSES: AppointmentStatus[] = ["COMPLETED", "CANCELLED", "N
 export const canCancel = (status: AppointmentStatus) => !FINAL_STATUSES.includes(status);
 export const canMarkNoShow = (status: AppointmentStatus) => status === "SCHEDULED" || status === "CONFIRMED";
 /** A no-show can be booked again for another time; a finished or cancelled visit can't move. */
-export const canReschedule = (status: AppointmentStatus) => status !== "COMPLETED" && status !== "CANCELLED";
+export const canReschedule = (status: AppointmentStatus) => ["SCHEDULED", "CONFIRMED", "NO_SHOW"].includes(status);
 
 export function canChangeStatus(from: AppointmentStatus, to: AppointmentStatus) {
   if (to === "CANCELLED") return canCancel(from);

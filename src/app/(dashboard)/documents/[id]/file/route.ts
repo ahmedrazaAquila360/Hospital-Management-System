@@ -9,7 +9,7 @@ import { documentDownloadUrl, r2KeyFromFileUrl } from "@/lib/r2";
 
 /**
  * Opens a document after checking the session: R2 files (private bucket) get a
- * 5-minute signed link, older documents redirect to their stored URL.
+ * 5-minute signed link; legacy public URLs require private-storage migration.
  * `?download=1` saves the file instead of previewing it.
  */
 export async function GET(request: NextRequest, ctx: RouteContext<"/documents/[id]/file">) {
@@ -21,7 +21,8 @@ export async function GET(request: NextRequest, ctx: RouteContext<"/documents/[i
   const doc = await prisma.document.findUnique({ where: { id }, select: { name: true, fileUrl: true, mimeType: true, patientId: true } });
   if (!doc) return new NextResponse("Not found", { status: 404 });
 
-  if (doc.patientId && user.role.name === "DENTIST") {
+  if (user.role.name === "DENTIST") {
+    if (!doc.patientId) return new NextResponse("Forbidden", { status: 403 });
     const assigned = await prisma.patient.findFirst({ where: { id: doc.patientId, AND: [patientScope(user)] }, select: { id: true } });
     if (!assigned) return new NextResponse("Forbidden", { status: 403 });
   }
@@ -34,7 +35,7 @@ export async function GET(request: NextRequest, ctx: RouteContext<"/documents/[i
     } });
   }
   const key = r2KeyFromFileUrl(doc.fileUrl);
-  if (!key) return NextResponse.redirect(new URL(doc.fileUrl, request.url));
+  if (!key) return new NextResponse("This legacy document must be migrated to private hospital storage.", { status: 410 });
 
   const ext = path.extname(key);
   const filename = doc.name.toLowerCase().endsWith(ext) ? doc.name : `${doc.name}${ext}`;

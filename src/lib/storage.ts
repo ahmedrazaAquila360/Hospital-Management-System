@@ -16,14 +16,7 @@ export function readPrivateFile(folder: "documents" | "patients", name: string) 
 export async function saveUploadedFile(file: File, folder: "patients" | "documents" | "clinic") {
   if (!file.size || file.size > MAX_UPLOAD_BYTES) throw new Error("Invalid file size.");
   const bytes = Buffer.from(await file.arrayBuffer());
-  const formats = [
-    { mime: "image/jpeg", ext: "jpg", matches: bytes.subarray(0,3).equals(Buffer.from([255,216,255])) },
-    { mime: "image/png", ext: "png", matches: bytes.subarray(0,8).equals(Buffer.from("89504e470d0a1a0a","hex")) },
-    { mime: "image/webp", ext: "webp", matches: bytes.toString("ascii",0,4) === "RIFF" && bytes.toString("ascii",8,12) === "WEBP" },
-    { mime: "application/pdf", ext: "pdf", matches: folder === "documents" && bytes.toString("ascii",0,5) === "%PDF-" },
-  ];
-  const format = formats.find(f => f.matches && file.type === f.mime);
-  if (!format) throw new Error("File contents must match the selected file type.");
+  const format = validateFileContents(bytes, file.type, folder);
   const name = randomBytes(16).toString("hex") + "." + format.ext;
   const root = folder === "clinic" ? path.join(process.cwd(),"public","uploads") : privateRoot;
   await mkdir(path.join(root,folder), { recursive: true, mode: 0o700 });
@@ -31,4 +24,17 @@ export async function saveUploadedFile(file: File, folder: "patients" | "documen
   if (folder === "documents") return "private:" + name;
   if (folder === "patients") return "/api/patient-photos/" + name;
   return "/uploads/clinic/" + name;
+}
+
+export function validateFileContents(bytes: Buffer, mime: string, folder: "documents" | "patients" | "clinic") {
+  if (!bytes.length || bytes.length > MAX_UPLOAD_BYTES) throw new Error("Invalid file size.");
+  const formats = [
+    { mime: "image/jpeg", ext: "jpg", matches: bytes.subarray(0,3).equals(Buffer.from([255,216,255])) },
+    { mime: "image/png", ext: "png", matches: bytes.subarray(0,8).equals(Buffer.from("89504e470d0a1a0a","hex")) },
+    { mime: "image/webp", ext: "webp", matches: bytes.toString("ascii",0,4) === "RIFF" && bytes.toString("ascii",8,12) === "WEBP" },
+    { mime: "application/pdf", ext: "pdf", matches: folder === "documents" && bytes.toString("ascii",0,5) === "%PDF-" },
+  ];
+  const format = formats.find(f => f.matches && mime === f.mime);
+  if (!format) throw new Error("File contents must match the selected file type.");
+  return format;
 }

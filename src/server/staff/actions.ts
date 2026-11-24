@@ -53,6 +53,7 @@ export async function createStaffAction(_prev: StaffFormState, formData: FormDat
 
   const role = await prisma.role.findUnique({ where: { name: data.role } });
   if (!role) return { error: "Invalid role selected." };
+  if (!can(actor, "permissions.edit")) return { error: "Permission administration access is required to assign staff roles." };
   if (role.name === SUPER_ADMIN && actor.role.name !== SUPER_ADMIN) return { error: ONLY_SUPER_ADMIN };
 
   const { url: avatarUrl, error: avatarError } = await handleAvatarUpload(formData);
@@ -102,6 +103,7 @@ export async function updateStaffAction(id: string, _prev: StaffFormState, formD
 
   const role = await prisma.role.findUnique({ where: { name: data.role } });
   if (!role) return { error: "Invalid role selected." };
+  if (!can(actor, "permissions.edit")) return { error: "Permission administration access is required to assign staff roles." };
   if (actor.role.name !== SUPER_ADMIN) {
     const target = await prisma.user.findUnique({ where: { id }, select: { role: { select: { name: true } } } });
     if (role.name === SUPER_ADMIN || target?.role.name === SUPER_ADMIN) return { error: ONLY_SUPER_ADMIN };

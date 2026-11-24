@@ -1,6 +1,6 @@
 import "server-only";
 import { dbDateKey } from "@/lib/calendar";
-import { formatDate, formatTime } from "@/lib/format";
+import { appointmentClock, appointmentMinutes } from "@/lib/appointment-clock";
 import { APPOINTMENT_STATUS_LABEL, APPOINTMENT_TYPE_LABEL } from "@/lib/labels";
 import type { AppointmentStatus } from "@/generated/prisma/enums";
 import type { listAppointmentsInRange } from "@/server/appointments/queries";
@@ -32,13 +32,12 @@ export type CalendarEvent = {
 };
 
 /**
- * Times are read with the server's clock, which is also how the booking action builds them
- * (`new Date("YYYY-MM-DDTHH:mm")`), so a 9:00 booking is drawn at 9:00.
+ * Draw stored instants using the configured hospital timezone.
  */
-export function toCalendarEvents(appointments: Appointment[]): CalendarEvent[] {
+export function toCalendarEvents(appointments: Appointment[], timeZone: string): CalendarEvent[] {
   return appointments.map((a) => {
-    const startMin = a.startTime.getHours() * 60 + a.startTime.getMinutes();
-    const rawEnd = a.endTime.getHours() * 60 + a.endTime.getMinutes();
+    const startMin = appointmentMinutes(a.startTime, timeZone);
+    const rawEnd = appointmentMinutes(a.endTime, timeZone);
     // An end at/after midnight or before the start would draw upside down; fall back to 30 min.
     const endMin = rawEnd > startMin ? rawEnd : Math.min(startMin + 30, 24 * 60);
     return {
@@ -46,7 +45,7 @@ export function toCalendarEvents(appointments: Appointment[]): CalendarEvent[] {
       patientName: a.patient.fullName,
       patientCode: a.patient.patientCode,
       patientPhone: a.patient.phone,
-      dateLabel: `${a.startTime.toLocaleDateString("en-US", { weekday: "short" })}, ${formatDate(a.startTime)}`,
+      dateLabel: a.startTime.toLocaleDateString("en-US", { timeZone, weekday: "short", year: "numeric", month: "short", day: "numeric" }),
       durationLabel: durationLabel(endMin - startMin),
       notes: a.notes ? (a.notes.length > 140 ? `${a.notes.slice(0, 140).trimEnd()}…` : a.notes) : null,
       dentistName: a.dentist.name,
@@ -57,7 +56,7 @@ export function toCalendarEvents(appointments: Appointment[]): CalendarEvent[] {
       dayKey: dbDateKey(a.date),
       startMin,
       endMin,
-      timeLabel: `${formatTime(a.startTime)} – ${formatTime(a.endTime)}`,
+      timeLabel: `${appointmentClock(a.startTime,timeZone)} – ${appointmentClock(a.endTime,timeZone)}`,
     };
   });
 }

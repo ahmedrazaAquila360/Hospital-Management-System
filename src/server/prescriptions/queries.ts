@@ -43,10 +43,12 @@ export async function getPrescriptionById(id: string) {
 
 /** Read-only totals for the Prescriptions summary cards. */
 export async function getPrescriptionStats() {
+  const actor = await requireUser();
+  const where = actor.role.name === "DENTIST" ? { dentistId: actor.id } : {};
   const [total, patients, dentists] = await Promise.all([
-    prisma.prescription.count(),
-    prisma.prescription.groupBy({ by: ["patientId"] }),
-    prisma.prescription.groupBy({ by: ["dentistId"] }),
+    prisma.prescription.count({ where }),
+    prisma.prescription.groupBy({ where, by: ["patientId"] }),
+    prisma.prescription.groupBy({ where, by: ["dentistId"] }),
   ]);
   return { total, patients: patients.length, dentists: dentists.length };
 }
