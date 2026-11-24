@@ -1,3 +1,4 @@
+import { requiresPatientAssignment } from "@/lib/permissions";
 import { appointmentClock } from "@/lib/appointment-clock";
 import { hospitalZone } from "@/server/reports/calendar";
 import type { Metadata } from "next";
@@ -63,7 +64,7 @@ export default async function AppointmentDetailPage({ params }: { params: Promis
     }),
     getWorkingHours(),
   ]);
-  if (!appointment || (user.role.name === "DENTIST" && appointment.dentistId !== user.id)) notFound();
+  if (!appointment || (requiresPatientAssignment(user) && appointment.dentistId !== user.id)) notFound();
 
   const canEdit = can(user, "appointments.edit");
   const patientId = appointment.patientId;

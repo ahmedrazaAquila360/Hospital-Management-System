@@ -1,4 +1,5 @@
 import "server-only";
+import { requiresPatientAssignment } from "@/lib/permissions";
 import { can } from "@/lib/permissions";
 import { requireUser } from "@/lib/auth/guard";
 import { patientScope } from "@/server/patients/access";
@@ -17,7 +18,7 @@ export async function listAppointmentsInRange(start: Date, end: Date, filters: A
     where: {
       date: { gte: start, lte: end },
       ...(filters.dentistId ? { dentistId: filters.dentistId } : {}),
-      ...(actor.role.name === "DENTIST" && { dentistId: actor.id }),
+      ...(requiresPatientAssignment(actor) && { dentistId: actor.id }),
       ...(filters.status ? { status: filters.status } : {}),
       ...(filters.patientId ? { patientId: filters.patientId } : {}),
     },
@@ -29,7 +30,7 @@ export async function listAppointmentsInRange(start: Date, end: Date, filters: A
 export async function getAppointmentById(id: string) {
   const actor = await requireUser();
   return prisma.appointment.findUnique({
-    where: { id, ...(actor.role.name === "DENTIST" && { dentistId: actor.id }) },
+    where: { id, ...(requiresPatientAssignment(actor) && { dentistId: actor.id }) },
     include: {
       patient: true,
       dentist: true,

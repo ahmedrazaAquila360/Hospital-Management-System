@@ -1,4 +1,5 @@
 import "server-only";
+import { requiresPatientAssignment } from "@/lib/permissions";
 import { requireUser } from "@/lib/auth/guard";
 import { patientScope } from "@/server/patients/access";
 import { prisma } from "@/lib/prisma";
@@ -13,7 +14,7 @@ export async function listDocuments(filters: DocumentFilters) {
   const page = Math.max(1, filters.page ?? 1);
   const pageSize = filters.pageSize ?? DEFAULT_PAGE_SIZE;
   const actor = await requireUser();
-  const where = { ...(actor.role.name === "DENTIST" && { patient: patientScope(actor) }),
+  const where = { ...(requiresPatientAssignment(actor) && { patient: patientScope(actor) }),
     AND: [
       filters.search ? { name: { contains: filters.search, mode: "insensitive" as const } } : {},
       filters.type ? { type: filters.type } : {},
@@ -38,7 +39,7 @@ export async function listDocuments(filters: DocumentFilters) {
 /** Read-only counts for the Documents summary cards. */
 export async function getDocumentStats() {
   const actor = await requireUser();
-  const byType = await prisma.document.groupBy({ where: actor.role.name === "DENTIST" ? { patient: patientScope(actor) } : {}, by: ["type"], _count: { _all: true } });
+  const byType = await prisma.document.groupBy({ where: requiresPatientAssignment(actor) ? { patient: patientScope(actor) } : {}, by: ["type"], _count: { _all: true } });
   const count = (t: DocumentType) => byType.find((r) => r.type === t)?._count._all ?? 0;
   const total = byType.reduce((sum, r) => sum + r._count._all, 0);
   return { total, xray: count("XRAY"), report: count("REPORT"), image: count("IMAGE"), other: total - count("XRAY") - count("REPORT") - count("IMAGE") };

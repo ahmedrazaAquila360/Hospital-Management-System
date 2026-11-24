@@ -1,3 +1,4 @@
+import { requiresPatientAssignment } from "@/lib/permissions";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getDepartmentCensus } from "@/server/dashboard/queries";
@@ -73,9 +74,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     getAppointmentStats(),
     getPatientGrowth(),
     getTreatmentStats(),
-    getTodayAppointments(today,user.role.name === "DENTIST" ? user.id : undefined),
-    getUpcomingAppointments(user.role.name === "DENTIST" ? user.id : undefined),
-    can(user,"patients.view") ? getRecentPatients(user.role.name === "DENTIST" ? user.id : undefined) : [],
+    getTodayAppointments(today,requiresPatientAssignment(user) ? user.id : undefined),
+    getUpcomingAppointments(requiresPatientAssignment(user) ? user.id : undefined),
+    can(user,"patients.view") ? getRecentPatients(requiresPatientAssignment(user) ? user.id : undefined) : [],
     can(user,"billing.view") ? getRecentPayments() : [],
     can(user,"billing.view") ? getOutstandingBalances() : [],
   ]);

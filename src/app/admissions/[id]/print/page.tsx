@@ -1,3 +1,4 @@
+import { requiresPatientAssignment } from "@/lib/permissions";
 import { notFound } from "next/navigation";
 import { requirePermission } from "@/lib/auth/guard";
 import { prisma } from "@/lib/prisma";
@@ -14,7 +15,7 @@ export default async function DischargeSummary({ params }: { params: Promise<{ i
     where: {
       id,
       status: "DISCHARGED",
-      ...(user.role.name === "DENTIST" && { doctorId: user.id }),
+      ...(requiresPatientAssignment(user) && { doctorId: user.id }),
     },
     include: {
       patient: { select: { fullName: true, patientCode: true, dob: true, allergies: true } },

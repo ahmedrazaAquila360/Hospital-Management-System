@@ -1,4 +1,5 @@
 "use server";
+import { requiresPatientAssignment } from "@/lib/permissions";
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -76,7 +77,7 @@ export async function createTreatmentAction(_prev: TreatmentFormState, formData:
   const parsed = parseForm(formData);
   if (!parsed.success) return { fieldErrors: fieldErrorsFrom(parsed.error.issues), error: "Please fix the highlighted fields." };
   const data = parsed.data;
-  if (user.role.name === "DENTIST" && (data.dentistId !== user.id || !await prisma.patient.findFirst({ where: { id: data.patientId, AND: [patientScope(user)] }, select: { id: true } }))) return { error: "Choose an assigned patient and your own doctor account." };
+  if (requiresPatientAssignment(user) && (data.dentistId !== user.id || !await prisma.patient.findFirst({ where: { id: data.patientId, AND: [patientScope(user)] }, select: { id: true } }))) return { error: "Choose an assigned patient and your own doctor account." };
 
   const treatment = await prisma.treatment.create({
     data: {
@@ -122,14 +123,14 @@ export async function updateTreatmentAction(
   const parsed = parseForm(formData);
   if (!parsed.success) return { fieldErrors: fieldErrorsFrom(parsed.error.issues), error: "Please fix the highlighted fields." };
   const data = parsed.data;
-  if (user.role.name === "DENTIST" && (data.dentistId !== user.id || !await prisma.patient.findFirst({ where: { id: data.patientId, AND: [patientScope(user)] }, select: { id: true } }))) return { error: "Choose an assigned patient and your own doctor account." };
+  if (requiresPatientAssignment(user) && (data.dentistId !== user.id || !await prisma.patient.findFirst({ where: { id: data.patientId, AND: [patientScope(user)] }, select: { id: true } }))) return { error: "Choose an assigned patient and your own doctor account." };
 
-  const existing = await prisma.treatment.findUnique({ where: { id, ...(user.role.name === "DENTIST" && { dentistId: user.id }) } });
+  const existing = await prisma.treatment.findUnique({ where: { id, ...(requiresPatientAssignment(user) && { dentistId: user.id }) } });
   if (!existing) return { error: "Treatment not found." };
   if (existing.status === "COMPLETED" || existing.patientId !== data.patientId) return { error: "Historical treatment identity and completed records cannot be overwritten. Record a new clinical amendment." };
 
   const treatment = await prisma.treatment.update({
-    where: { id, status: { not: "COMPLETED" }, ...(user.role.name === "DENTIST" && { dentistId: user.id }) },
+    where: { id, status: { not: "COMPLETED" }, ...(requiresPatientAssignment(user) && { dentistId: user.id }) },
     data: {
       patientId: data.patientId,
       dentistId: data.dentistId,
@@ -168,7 +169,7 @@ export async function updateTreatmentStatusAction(id: string, status: TreatmentS
   const user = await requireUser();
   if (!can(user, "treatments.edit")) throw new Error(NO_PERMISSION);
   const treatment = await prisma.treatment.update({
-    where: { id, status: { not: "COMPLETED" }, ...(user.role.name === "DENTIST" && { dentistId: user.id }) },
+    where: { id, status: { not: "COMPLETED" }, ...(requiresPatientAssignment(user) && { dentistId: user.id }) },
     data: { status, completedAt: status === "COMPLETED" ? new Date() : null },
     include: { patient: true, dentist: true },
   });
@@ -208,7 +209,7 @@ export async function updateTreatmentStatusAction(id: string, status: TreatmentS
 export async function deleteTreatmentAction(id: string): Promise<{ error?: string }> {
   const user = await requireUser();
   if (!can(user, "treatments.delete")) return { error: NO_PERMISSION };
-  const treatment = await prisma.treatment.delete({ where: { id, ...(user.role.name === "DENTIST" && { dentistId: user.id }) } }).catch(() => null);
+  const treatment = await prisma.treatment.delete({ where: { id, ...(requiresPatientAssignment(user) && { dentistId: user.id }) } }).catch(() => null);
   if (!treatment) return { error: "This treatment no longer exists." };
   await prisma.activityLog.create({
     data: {

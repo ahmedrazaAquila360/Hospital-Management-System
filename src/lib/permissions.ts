@@ -61,6 +61,7 @@ export const PERMISSION_CATALOG = [
     label: "Patients",
     actions: [
       { action: "view", label: "View", description: "Patient list, profiles and patient search." },
+      { action: "all", label: "All patients", description: "Allow a custom role to access patients across staff assignments. Module permissions are still required; Doctor roles remain assigned-only." },
       { action: "create", label: "Create", description: "Add new patients." },
       { action: "edit", label: "Edit", description: "Update patient details and medical history." },
       { action: "delete", label: "Delete", description: "Archive a patient and retain linked history." },
@@ -258,4 +259,9 @@ export function effectivePermissions(roleName: string, roleKeys: string[], overr
     else set.delete(o.key);
   }
   return [...set];
+}
+
+/** Custom roles fail closed unless explicitly granted cross-assignment access. */
+export function requiresPatientAssignment(user: Pick<SessionUser, "role" | "permissions">): boolean {
+  return user.role.name === "DENTIST" || (!isBuiltInRole(user.role.name) && !can(user, "patients.all"));
 }

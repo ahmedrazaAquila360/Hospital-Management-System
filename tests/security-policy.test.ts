@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { can, canAny, ALL_PERMISSION_KEYS, RETAINED_DELETE_PERMISSIONS, type PermissionKey } from "../src/lib/permissions";
+import { can, canAny, ALL_PERMISSION_KEYS, RETAINED_DELETE_PERMISSIONS, requiresPatientAssignment, type PermissionKey } from "../src/lib/permissions";
 import { validateFileContents } from "../src/lib/storage";
 import { isOwnedStagingKey } from "../src/lib/r2";
 const admin={permissions:[...ALL_PERMISSION_KEYS]};
@@ -18,3 +18,12 @@ assert.equal(isOwnedStagingKey('documents/staging/alice/'+'a'.repeat(32)+'.pdf',
 assert.equal(isOwnedStagingKey('documents/staging/alice/../'+'a'.repeat(32)+'.pdf','alice'),false);
 assert.equal(isOwnedStagingKey('documents/'+'a'.repeat(32)+'.pdf','alice'),false);
 console.log('Retention overrides, permission denial, upload signatures and staging ownership checks passed.');
+
+const roleActor = (name: string, permissions: string[] = []) => ({role: {name, label: name}, permissions});
+assert.equal(requiresPatientAssignment(roleActor("CUSTOM_DOCTOR", ["patients.view"])), true);
+assert.equal(requiresPatientAssignment(roleActor("CUSTOM_RECEPTION", ["patients.view", "patients.all"])), false);
+assert.equal(requiresPatientAssignment(roleActor("DENTIST", ["patients.all"])), true);
+assert.equal(requiresPatientAssignment(roleActor("RECEPTIONIST")), false);
+assert.equal(requiresPatientAssignment(roleActor("ADMIN")), false);
+assert.equal(can(roleActor("CUSTOM_RECEPTION", ["patients.all"]), "patients.view"), false);
+console.log("Custom roles require assignment unless explicitly granted all-patient scope; module permissions remain independent.");

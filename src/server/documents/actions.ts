@@ -1,4 +1,5 @@
 "use server";
+import { requiresPatientAssignment } from "@/lib/permissions";
 
 import { revalidatePath } from "next/cache";
 import { patientScope } from "@/server/patients/access";
@@ -107,7 +108,7 @@ export async function uploadDocumentAction(_prev: DocumentUploadState, formData:
 export async function deleteDocumentAction(id: string, patientId: string | null): Promise<DocumentUploadState> {
   const user = await requireUser();
   if (!can(user, "documents.delete")) return { error: NO_PERMISSION };
-  const doc = await prisma.document.delete({ where: { id, ...(user.role.name === "DENTIST" && { patient: patientScope(user) }) } }).catch(() => null);
+  const doc = await prisma.document.delete({ where: { id, ...(requiresPatientAssignment(user) && { patient: patientScope(user) }) } }).catch(() => null);
   if (!doc) return { error: "This document no longer exists." };
   const key = r2KeyFromFileUrl(doc.fileUrl);
   if (key) await deleteDocumentObject(key).catch((err) => console.error("R2 delete failed", key, err));

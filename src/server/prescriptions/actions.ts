@@ -1,4 +1,5 @@
 "use server";
+import { requiresPatientAssignment } from "@/lib/permissions";
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -48,7 +49,7 @@ export async function createPrescriptionAction(_prev: PrescriptionFormState, for
   }
   const data = parsed.data;
 
-  if (user.role.name === "DENTIST" && user.id !== data.dentistId) return { error: "Choose your own doctor account." };
+  if (requiresPatientAssignment(user) && user.id !== data.dentistId) return { error: "Choose your own doctor account." };
   if (data.appointmentId && !await prisma.appointment.findFirst({ where: { id: data.appointmentId, patientId: data.patientId, dentistId: data.dentistId }, select: { id: true } })) {
     return { error: "The patient and doctor must match the consultation." };
   }
@@ -94,7 +95,7 @@ export async function createPrescriptionAction(_prev: PrescriptionFormState, for
 export async function deletePrescriptionAction(id: string) {
   const user = await requireUser();
   assertPermission(user, "prescriptions.delete");
-  const prescription = await prisma.prescription.delete({ where: { id, ...(user.role.name === "DENTIST" && { dentistId: user.id }), encounterId: null } });
+  const prescription = await prisma.prescription.delete({ where: { id, ...(requiresPatientAssignment(user) && { dentistId: user.id }), encounterId: null } });
   await prisma.activityLog.create({
     data: {
       userId: user.id,

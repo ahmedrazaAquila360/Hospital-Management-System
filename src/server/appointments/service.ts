@@ -1,4 +1,5 @@
 import "server-only";
+import { requiresPatientAssignment } from "@/lib/permissions";
 import type { Prisma } from "@/generated/prisma/client";
 import { appointmentInstant } from "./clock";
 import { hospitalZone } from "@/server/reports/calendar";
@@ -72,7 +73,7 @@ export async function createAppointment(user: SessionUser, _prev: AppointmentFor
     return { fieldErrors: fieldErrorsFrom(parsed.error.issues), error: "Please fix the highlighted fields." };
   }
   const data = parsed.data;
-  if (user.role.name === "DENTIST" && (data.dentistId !== user.id || !await prisma.patient.findFirst({ where: { id: data.patientId, AND: [patientScope(user)] }, select: { id: true } }))) return { error: "Choose an assigned patient and your own doctor account." };
+  if (requiresPatientAssignment(user) && (data.dentistId !== user.id || !await prisma.patient.findFirst({ where: { id: data.patientId, AND: [patientScope(user)] }, select: { id: true } }))) return { error: "Choose an assigned patient and your own doctor account." };
   const outside = await hoursError(data.date, data.startTime, data.endTime, data.dentistId);
   if (outside) return outside;
 
@@ -137,11 +138,11 @@ export async function updateAppointment(
     return { fieldErrors: fieldErrorsFrom(parsed.error.issues), error: "Please fix the highlighted fields." };
   }
   const data = parsed.data;
-  if (user.role.name === "DENTIST" && (data.dentistId !== user.id || !await prisma.patient.findFirst({ where: { id: data.patientId, AND: [patientScope(user)] }, select: { id: true } }))) return { error: "Choose an assigned patient and your own doctor account." };
+  if (requiresPatientAssignment(user) && (data.dentistId !== user.id || !await prisma.patient.findFirst({ where: { id: data.patientId, AND: [patientScope(user)] }, select: { id: true } }))) return { error: "Choose an assigned patient and your own doctor account." };
 
   // Only a changed date or time is checked, so editing the notes of an appointment booked
   // before the hours changed still works.
-  const existing = await prisma.appointment.findUnique({ where: { id, ...(user.role.name === "DENTIST" && { dentistId: user.id }) }, select: { status: true, startTime: true, endTime: true, encounter: { select: { id: true } }, patientId: true, dentistId: true, departmentId: true } });
+  const existing = await prisma.appointment.findUnique({ where: { id, ...(requiresPatientAssignment(user) && { dentistId: user.id }) }, select: { status: true, startTime: true, endTime: true, encounter: { select: { id: true } }, patientId: true, dentistId: true, departmentId: true } });
   if (!existing) return { error: "Appointment unavailable." };
   if (existing.encounter || ["COMPLETED", "CANCELLED"].includes(existing.status)) return { error: "Historical visits cannot be overwritten. Use clinical amendments or book a new appointment." };
   if (existing?.encounter && (existing.patientId !== data.patientId || existing.dentistId !== data.dentistId)) return { error: "The patient and doctor are fixed after check-in." };
@@ -158,7 +159,7 @@ export async function updateAppointment(
   await prisma.$transaction(async tx => {
   await lockSchedules(tx, [existing.dentistId, data.dentistId]);
   const appointment = await tx.appointment.update({
-    where: { id, status: existing.status, startTime: existing.startTime, endTime: existing.endTime, ...(user.role.name === "DENTIST" && { dentistId: user.id }) },
+    where: { id, status: existing.status, startTime: existing.startTime, endTime: existing.endTime, ...(requiresPatientAssignment(user) && { dentistId: user.id }) },
     data: {
       departmentId: existing?.dentistId === data.dentistId ? existing.departmentId : assignedDoctor.departmentId,
       patientId: data.patientId,
@@ -195,7 +196,7 @@ export async function updateAppointmentStatus(user: SessionUser, id: string, sta
   if (!can(user, "appointments.edit")) throw new Error("Appointment edit permission required.");
   // Only moves the visit flow allows (the menu offers the same ones); a stale page can't
   // reopen a completed visit or skip back.
-  const current = await prisma.appointment.findUnique({ where: { id, ...(user.role.name === "DENTIST" && { dentistId: user.id }) }, select: { status: true, dentistId: true } });
+  const current = await prisma.appointment.findUnique({ where: { id, ...(requiresPatientAssignment(user) && { dentistId: user.id }) }, select: { status: true, dentistId: true } });
   if (!current) return { ok: false, error: "This appointment no longer exists." };
   if (current.status === status) return { ok: true };
   if (!canChangeStatus(current.status, status)) {
@@ -204,7 +205,7 @@ export async function updateAppointmentStatus(user: SessionUser, id: string, sta
   await prisma.$transaction(async tx => {
     await lockSchedules(tx, [current.dentistId]);
     const appointment = await tx.appointment.update({
-      where: { id, status: current.status, ...(user.role.name === "DENTIST" && { dentistId: user.id }) },
+      where: { id, status: current.status, ...(requiresPatientAssignment(user) && { dentistId: user.id }) },
       data: { status },
       include: { patient: true, dentist: true },
     });
@@ -263,7 +264,7 @@ export async function rescheduleAppointment(
   if (endTime <= startTime) return { ok: false, error: "End time must be after start time.", field: "endTime" };
 
   const existing = await prisma.appointment.findUnique({
-    where: { id, ...(user.role.name === "DENTIST" && { dentistId: user.id }) },
+    where: { id, ...(requiresPatientAssignment(user) && { dentistId: user.id }) },
     select: { status: true, dentistId: true, startTime: true, endTime: true, patient: { select: { id: true, fullName: true } } },
   });
   if (!existing) return { ok: false, error: "This appointment no longer exists." };
@@ -283,7 +284,7 @@ export async function rescheduleAppointment(
   await prisma.$transaction(async tx => {
   await lockSchedules(tx, [existing.dentistId]);
   await tx.appointment.update({
-    where: { id, status: existing.status, startTime: existing.startTime, endTime: existing.endTime, ...(user.role.name === "DENTIST" && { dentistId: user.id }) },
+    where: { id, status: existing.status, startTime: existing.startTime, endTime: existing.endTime, ...(requiresPatientAssignment(user) && { dentistId: user.id }) },
     data: { date: new Date(date), startTime: start, endTime: end, ...(reopened ? { status: "SCHEDULED" as const } : {}) },
   });
 

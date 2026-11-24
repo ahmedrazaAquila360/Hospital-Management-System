@@ -36,3 +36,15 @@ R2's live upload/download integration needs verification with the deployment's p
 ## Verification result
 
 Policy tests, appointment database regressions, targeted ESLint, TypeScript validation through the production build, the final production build and `git diff --check` passed. Browser checks against that production build confirmed anonymous patient access redirects to login; cashier access to patients, OPD, laboratory, admissions and documents redirects to the permission-denied page; an authenticated in-browser document fetch returns 403; and admin appointment list/new pages load while retained-record lists expose no delete buttons. Browser checks are smoke coverage, not exhaustive tests of every role/action combination. Previously completed payment, refund, pharmacy and inpatient contention suites were not rerun because their services did not change.
+
+## Custom-role patient access follow-up — November 24, 2026
+
+Custom roles now default to the same assignment predicate used by doctors on patient profiles/search, documents/downloads/photos, prescriptions, treatments and appointment reads/writes. Dashboard patient/appointment lists and discharge-print restrictions also use the shared predicate. A custom role can no longer bypass these checks merely because its name differs from `DENTIST`.
+
+The existing Permissions matrix exposes **Patients → All patients** (`patients.all`) for administrators to explicitly grant cross-assignment access to custom roles. It does not grant module view/edit permissions. Built-in Doctor accounts remain restricted even if granted this key. Other built-in operational roles retain their existing behavior. Existing custom roles receive no automatic grant; review custom receptionist/administrative roles after deployment. Copying an unrestricted role can copy this explicit permission. Revoking it takes effect on the next request through existing session permission loading.
+
+Deploy `20261124000100_custom_patient_scope` before using the permission editor. This additive migration inserts only a permission catalog row and does not modify patient records or grant existing roles broader access. It was applied only to the dedicated hospital development database.
+
+The policy suite now checks default restriction, explicit grant, built-in Doctor protection and independence from module permissions. The appointment database suite verifies assigned/unassigned patient queries for custom roles, denial of unrelated-patient registration and appointment status mutations, and explicit broad access. The complete appointment suite, lint and production build passed.
+
+Boundary: laboratory, pharmacy and inpatient operational worklists still use their dedicated module permissions; this increment does not convert those permissions to assignment-only access. Dashboard aggregate statistics remain hospital-wide for dashboard viewers. The doctor scheduling catalog still requires the built-in Doctor role. Branch isolation, department-based assignment and live R2 validation remain outstanding.

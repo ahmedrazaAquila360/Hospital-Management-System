@@ -1,3 +1,4 @@
+import { requiresPatientAssignment } from "@/lib/permissions";
 import { NextResponse } from "next/server";
 import { patientScope } from "@/server/patients/access";
 import { prisma } from "@/lib/prisma";
@@ -45,7 +46,7 @@ export async function GET(request: Request) {
 
   if (can(user, "appointments.view")) {
     const appointments = await prisma.appointment.findMany({
-      where: { ...(user.role.name === "DENTIST" && { dentistId: user.id }), patient: { fullName: { contains: q, mode: "insensitive" } } },
+      where: { ...(requiresPatientAssignment(user) && { dentistId: user.id }), patient: { fullName: { contains: q, mode: "insensitive" } } },
       include: { patient: true, dentist: true },
       take: 5,
       orderBy: { date: "desc" },
@@ -85,7 +86,7 @@ export async function GET(request: Request) {
 
   if (can(user, "treatments.view")) {
     const treatments = await prisma.treatment.findMany({
-      where: { ...(user.role.name === "DENTIST" && { dentistId: user.id }),
+      where: { ...(requiresPatientAssignment(user) && { dentistId: user.id }),
         OR: [
           { name: { contains: q, mode: "insensitive" } },
           { patient: { fullName: { contains: q, mode: "insensitive" } } },

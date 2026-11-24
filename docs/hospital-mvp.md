@@ -149,3 +149,9 @@ Completed the scoped inherited-route and historical-record review, with details 
 Appointment services now have repeatable database regression coverage for overlapping/concurrent bookings, adjacent slots, schedule hours, rescheduling, cancellation/no-show, check-in, walk-ins, completion billing, patient assignment and rollback. Ordered doctor locks prevent concurrent overlap inserts from deadlocking. Scheduling uses hospital-local instants and rejects invalid dates and nonexistent DST times.
 
 Policy tests, appointment database tests, targeted lint, production build/TypeScript and production-browser permission smoke checks passed. No migration or UI redesign was required. Live R2 deployment verification, broader branch/custom-role scope and clinical-pilot acceptance remain outstanding; this is not a claim of full ERP completion.
+
+## Custom-role patient scope — November 24, 2026
+
+Closed the custom-role bypass in inherited patient, document, prescription, treatment and appointment authorization checks. Custom roles now require patient/staff assignment unless explicitly granted **Patients → All patients** in the existing Permissions matrix. Module permissions remain required, and built-in Doctor restrictions cannot be lifted by this grant. No UI redesign was needed.
+
+Apply migration `20261124000100_custom_patient_scope`; it adds a permission row without granting existing custom roles broader access. Review custom administrative/reception roles for an intentional grant. Policy tests, the expanded appointment database regression, lint and production build passed. See the security audit follow-up for exact scope: operational worklists and dashboard aggregates retain their existing permission semantics, and branch isolation remains outstanding.
