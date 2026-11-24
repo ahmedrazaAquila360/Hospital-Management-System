@@ -25,7 +25,7 @@ export default async function Admissions() {
       },
     }),
     prisma.user.findMany({
-      where: { role: { name: "DENTIST" }, department: { active: true }, status: "ACTIVE" },
+      where: { role: { name: "DENTIST" }, branchMemberships: {some: {active: true}}, status: "ACTIVE" },
       select: { id: true, name: true },
     }),
   ]);

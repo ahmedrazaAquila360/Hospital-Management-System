@@ -45,7 +45,7 @@ export async function getAppointmentById(id: string) {
 export async function getDentists() {
   const role = await prisma.role.findUnique({ where: { name: "DENTIST" } });
   if (!role) return [];
-  return prisma.user.findMany({ where: { roleId: role.id, status: "ACTIVE" }, select: { id: true, name: true }, orderBy: { name: "asc" } });
+  return prisma.user.findMany({ where: { roleId: role.id, status: "ACTIVE", branchMemberships: {some: {active: true}} }, select: { id: true, name: true }, orderBy: { name: "asc" } });
 }
 
 export async function searchPatientsForSelect(query: string) {

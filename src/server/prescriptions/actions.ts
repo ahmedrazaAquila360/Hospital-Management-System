@@ -1,6 +1,8 @@
 "use server";
 import { requiresPatientAssignment } from "@/lib/permissions";
 
+import { medicationReview } from "@/server/medications/safety";
+import { createHash } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
@@ -12,6 +14,8 @@ import { prescriptionSchema } from "@/lib/validations/prescription";
 export type PrescriptionFormState = {
   error?: string;
   allergies?: string;
+  medicationWarnings?: string[];
+  reviewToken?: string;
 };
 
 export async function createPrescriptionAction(_prev: PrescriptionFormState, formData: FormData): Promise<PrescriptionFormState> {
@@ -48,6 +52,8 @@ export async function createPrescriptionAction(_prev: PrescriptionFormState, for
     return { error: parsed.error.issues[0]?.message ?? "Please fix the highlighted fields." };
   }
   const data = parsed.data;
+  const provider = await prisma.user.findFirst({where: {id: data.dentistId, status: "ACTIVE", role: {name: "DENTIST"}, branchMemberships: {some: {active: true}}}, select: {id: true}});
+  if (!provider) return {error: "Choose an active doctor assigned to this branch."};
 
   if (requiresPatientAssignment(user) && user.id !== data.dentistId) return { error: "Choose your own doctor account." };
   if (data.appointmentId && !await prisma.appointment.findFirst({ where: { id: data.appointmentId, patientId: data.patientId, dentistId: data.dentistId }, select: { id: true } })) {
@@ -65,7 +71,17 @@ export async function createPrescriptionAction(_prev: PrescriptionFormState, for
     ] } });
     if (!valid) return { error: "Choose the patient and attending doctor for this encounter." };
   }
-  const prescription = await prisma.prescription.create({
+  const review = await medicationReview(data.medicines.map(m=>m.medicineName), patient.allergies);
+  const reviewToken = createHash("sha256").update(review.fingerprint + JSON.stringify(data)).digest("hex");
+  if (formData.get("medicationReview") !== reviewToken) return {
+    error: "Review medicine verification before signing.", allergies: patient.allergies ?? undefined,
+    medicationWarnings: [...review.result.warnings, review.result.limitation], reviewToken,
+  };
+  const prescription = await prisma.$transaction(async tx => {
+    await tx.$queryRaw`SELECT id FROM "Patient" WHERE id=${data.patientId} FOR UPDATE`;
+    const current = await tx.patient.findFirstOrThrow({where: {id: data.patientId, AND: [patientScope(user)]}, select: {allergies: true}});
+    if (current.allergies !== patient.allergies) throw new Error("Allergies changed. Review the patient again.");
+    const saved = await tx.prescription.create({
     data: {
       encounterId: typeof encounterId === "string" ? encounterId : null,
       patientId: data.patientId,
@@ -75,6 +91,9 @@ export async function createPrescriptionAction(_prev: PrescriptionFormState, for
       medicines: { create: data.medicines },
     },
     include: { patient: true },
+    });
+    await tx.activityLog.create({data: {userId: user.id, action: "MEDICATION_REVIEW", entityType: "Prescription", entityId: saved.id, metadata: {...review.result, reviewToken}}});
+    return saved;
   });
 
   await prisma.activityLog.create({

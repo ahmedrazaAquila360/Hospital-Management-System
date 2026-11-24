@@ -83,6 +83,7 @@ export function PrescriptionForm({
 
       <div className="surface-card @container overflow-hidden p-0">
         {state.allergies && <label className="block p-4 text-destructive"><input type="checkbox" name="reviewedAllergies" value={state.allergies} required /> I reviewed the recorded allergies · {state.allergies}</label>}
+        {state.reviewToken && <div className="space-y-2 p-4"><ul className="list-disc pl-5">{state.medicationWarnings?.map((w,i)=><li key={i}>{w}</li>)}</ul><label><input type="checkbox" name="medicationReview" value={state.reviewToken} required/> I reviewed these checks and the prescribed regimen.</label></div>}
         <ErrorSummary message={state.error} trigger={state} />
         <FormSection icon={UserRound} title="Patient & Provider">
           <div className="grid grid-cols-1 gap-5 @xl:grid-cols-2">

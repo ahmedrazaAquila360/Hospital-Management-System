@@ -11,7 +11,7 @@ async function seed() {
   await prisma.$transaction(
     async (tx) => {
       const department = await tx.department.upsert({
-        where: { name: "General Medicine" },
+        where: { branchId_name: {branchId: "branch-main", name: "General Medicine"} },
         update: {},
         create: { name: "General Medicine" },
       });

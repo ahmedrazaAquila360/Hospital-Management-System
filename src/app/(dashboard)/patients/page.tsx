@@ -1,3 +1,5 @@
+import { enrollPatient } from "@/server/branches/actions";
+import { Input } from "@/components/ui/input";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Activity, CalendarCheck2, Plus, UserPlus, Users } from "lucide-react";
@@ -90,6 +92,7 @@ export default async function PatientsPage({ searchParams }: { searchParams: Sea
       </div>
 
       <section className="surface-card @container overflow-hidden p-0">
+        {canCreate && <form action={enrollPatient} className="mb-4 flex gap-2"><Input name="patientCode" placeholder="Existing hospital MRN" required/><Button variant="outline">Enroll existing patient in this branch</Button></form>}
         <PatientsToolbar dentists={dentists} />
         <PatientsTable rows={rows} canManage={canManage} canDelete={can(user, "patients.delete")} filtered={filtered} />
         <ListFooter page={list.page} pageSize={list.pageSize} total={list.total} shown={rows.length} noun="patient" />

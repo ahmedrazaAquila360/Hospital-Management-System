@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { basePrisma } from "@/lib/prisma-base";
 import { prisma } from "@/lib/prisma";
 import { assertPermission, requireUser } from "@/lib/auth/guard";
 import { can } from "@/lib/permissions";
@@ -81,6 +82,9 @@ export async function createPatientAction(_prev: PatientFormState, formData: For
       select: { patientCode: true },
     });
     if (duplicate) return { duplicate: duplicate.patientCode };
+    // Central identity check reveals no other branch's clinical record or MRN.
+    const elsewhere = await basePrisma.patient.count({where: {fullName: {equals: data.fullName.trim(), mode: "insensitive"}, dob: new Date(data.dob), phone: data.phone.trim()}});
+    if (elsewhere) return {duplicate: "already registered at another branch; use the existing hospital MRN to enroll"};
 
     const [{ serial }] = await tx.$queryRaw<{ serial: bigint }[]>`SELECT nextval('hospital_mrn') AS serial`;
     const patientCode = `MRN-${String(serial).padStart(7, "0")}`;

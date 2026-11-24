@@ -220,6 +220,8 @@ export function isBuiltInRole(name: string): name is BuiltInRole {
 }
 
 export type SessionUser = {
+  activeBranchId?: string;
+  branches?: {id: string; name: string}[];
   id: string;
   name: string;
   email: string;

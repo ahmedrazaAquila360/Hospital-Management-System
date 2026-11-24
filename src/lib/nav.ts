@@ -42,6 +42,7 @@ export const NAV_ITEMS: NavItem[] = [
     icon: ShieldUser,
     children: [
       { title: "Doctors", href: "/doctors", icon: Stethoscope, permission: "staff.edit" },
+      { title: "Branches", href: "/branches", icon: Stethoscope, permission: "permissions.edit" },
       { title: "Departments", href: "/departments", icon: Stethoscope, permission: "settings.edit" },
       { title: "Staff", href: "/staff", icon: UserCog, permission: "staff.view" },
       { title: "Permissions", href: "/permissions", icon: ShieldCheck, permission: "permissions.view" },

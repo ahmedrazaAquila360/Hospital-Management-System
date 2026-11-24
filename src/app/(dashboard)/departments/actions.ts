@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/auth/guard";
+import { requestBranch } from "@/lib/prisma";
 import { prisma } from "@/lib/prisma";
 
 export async function saveDepartment(form: FormData) {
@@ -38,7 +39,7 @@ export async function assignDepartment(form: FormData) {
     throw new Error("Choose a staff member and department.");
   await prisma.$transaction(async (tx) => {
     if (departmentId) await tx.department.findFirstOrThrow({ where: { id: departmentId, active: true } });
-    await tx.user.update({ where: { id: staffId }, data: { departmentId: departmentId || null } });
+    await tx.branchMembership.update({where: {userId_branchId: {userId: staffId, branchId: await requestBranch()}}, data: {departmentId: departmentId || null}});
     await tx.activityLog.create({
       data: {
         userId: actor.id,
@@ -68,7 +69,7 @@ export async function saveService(form: FormData) {
     throw new Error("Enter the service name, category and price.");
   await prisma.department.findFirstOrThrow({ where: { id: departmentId, active: true } });
   await prisma.service.upsert({
-    where: { name },
+    where: { branchId_name: {branchId: await requestBranch(), name} },
     create: { name, category, departmentId, price },
     update: { category, departmentId, price },
   });

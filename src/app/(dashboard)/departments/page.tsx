@@ -15,7 +15,7 @@ export default async function DepartmentsPage() {
   const staff = can(actor, "staff.edit")
     ? await prisma.user.findMany({
         where: { status: "ACTIVE" },
-        select: { id: true, name: true, department: { select: { name: true } } },
+        select: { id: true, name: true, branchMemberships: {select: {department: {select: {name: true}}}} },
         orderBy: { name: "asc" },
       })
     : [];
@@ -128,7 +128,7 @@ export default async function DepartmentsPage() {
                 </option>
                 {staff.map((s) => (
                   <option key={s.id} value={s.id}>
-                    {s.name} · {s.department?.name ?? "Unassigned"}
+                    {s.name} · {s.branchMemberships[0]?.department?.name ?? "Unassigned"}
                   </option>
                 ))}
               </select>

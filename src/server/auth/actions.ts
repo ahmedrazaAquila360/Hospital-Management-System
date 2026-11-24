@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { basePrisma } from "@/lib/prisma-base";
 import { verifyPassword } from "@/lib/auth/password";
 import { createSession, destroySession, getSessionUser } from "@/lib/auth/session";
 import { loginSchema } from "@/lib/validations/auth";
@@ -31,7 +32,7 @@ export async function loginAction(_prev: LoginActionState, formData: FormData): 
   const { email, password, remember } = parsed.data;
 
   // passwordHash is omitted globally (src/lib/prisma.ts); sign-in is one of two places that needs it.
-  const user = await prisma.user.findUnique({ where: { email }, omit: { passwordHash: false } });
+  const user = await basePrisma.user.findUnique({ where: { email }, omit: { passwordHash: false } });
   if (!user) {
     return { error: "Invalid email or password." };
   }
@@ -88,7 +89,7 @@ export async function forgotPasswordAction(
     return { error: parsed.error.issues[0]?.message ?? "Enter a valid email address." };
   }
 
-  const user = await prisma.user.findUnique({ where: { email: parsed.data.email } });
+  const user = await basePrisma.user.findUnique({ where: { email: parsed.data.email } });
   if (user) {
     // No transactional email provider is configured for this environment;
     // in production this would enqueue a reset-link email via that provider.

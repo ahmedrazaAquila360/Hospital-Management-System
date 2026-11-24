@@ -4,7 +4,8 @@ import { returnDispensedStock } from "@/server/pharmacy/return-transaction";
 import { dispensePrescription } from "@/server/pharmacy/dispense-transaction";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { requirePermission } from "@/lib/auth/guard";
+import { assertPermission, requirePermission } from "@/lib/auth/guard";
+import { requestBranch } from "@/lib/prisma";
 import { prisma } from "@/lib/prisma";
 
 const field = z.string().trim().min(1).max(150);
@@ -13,6 +14,7 @@ const quantity = z.coerce.number().int().positive().max(1000000);
 
 export async function receive(form: FormData) {
   const actor = await requirePermission("pharmacy.manage");
+  assertPermission(actor, "pharmacy.view");
   const data = z
     .object({
       generic: field,
@@ -37,7 +39,7 @@ export async function receive(form: FormData) {
       update: {},
     });
     const existing = await tx.pharmacyBatch.findUnique({
-      where: { medicationId_lot: { medicationId: medication.id, lot: batch.lot } },
+      where: { branchId_medicationId_lot: { branchId: await requestBranch(), medicationId: medication.id, lot: batch.lot } },
     });
     if (
       existing &&
@@ -70,6 +72,7 @@ export async function receive(form: FormData) {
 
 export async function dispense(form: FormData) {
   const actor = await requirePermission("pharmacy.edit");
+  assertPermission(actor, "pharmacy.view");
   const data = z
     .object({ batchId: field, medicineId: field, quantity, verified: z.literal("on") })
     .parse(Object.fromEntries(form));
@@ -80,6 +83,7 @@ export async function dispense(form: FormData) {
 
 export async function returnStock(form: FormData) {
   const actor = await requirePermission("pharmacy.edit");
+  assertPermission(actor, "pharmacy.view");
   const data = z.object({ fillId: field, quantity, reason: field, expectedReturned: z.coerce.number().int().min(0) }).parse(Object.fromEntries(form));
   await returnDispensedStock({ ...data, restock: form.get("restock") === "on" }, actor.id);
   revalidatePath("/pharmacy");
@@ -88,6 +92,7 @@ export async function returnStock(form: FormData) {
 
 export async function adjustStock(form: FormData) {
   const actor = await requirePermission("pharmacy.manage");
+  assertPermission(actor, "pharmacy.view");
   const data = z.object({ batchId: field, counted: z.coerce.number().int().min(0).max(1000000), expected: z.coerce.number().int().min(0), reason: field }).parse(Object.fromEntries(form));
   await prisma.$transaction(async tx => {
     await tx.pharmacyBatch.update({ where: { id: data.batchId, quantity: data.expected }, data: { quantity: data.counted } });

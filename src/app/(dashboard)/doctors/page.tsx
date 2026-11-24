@@ -11,8 +11,8 @@ import { saveDoctor } from "./actions";
 export default async function Doctors() {
   await requirePermission("staff.edit");
   const doctors = await prisma.user.findMany({
-    where: { role: { name: "DENTIST" } },
-    include: { doctorProfile: true, department: true },
+    where: { role: { name: "DENTIST" }, branchMemberships: {some: {active: true}} },
+    include: { doctorProfile: true, branchMemberships: {include: {department: true}} },
     orderBy: { name: "asc" },
   });
   return (
@@ -30,7 +30,7 @@ export default async function Doctors() {
             <CardHeader>
               <CardTitle>{d.name}</CardTitle>
               <p>
-                {d.department?.name ?? "Unassigned"} · {d.status} · {d.email} {d.phone}
+                {d.branchMemberships[0]?.department?.name ?? "Unassigned"} · {d.status} · {d.email} {d.phone}
               </p>
             </CardHeader>
             <CardContent>

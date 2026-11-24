@@ -123,5 +123,5 @@ export async function getPatientById(id: string) {
 export async function getDentistOptions() {
   const role = await prisma.role.findUnique({ where: { name: "DENTIST" } });
   if (!role) return [];
-  return prisma.user.findMany({ where: { roleId: role.id, status: "ACTIVE" }, orderBy: { name: "asc" } });
+  return prisma.user.findMany({ where: { roleId: role.id, status: "ACTIVE", branchMemberships: {some: {active: true}} }, orderBy: { name: "asc" } });
 }

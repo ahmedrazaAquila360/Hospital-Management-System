@@ -2,7 +2,7 @@ import "server-only";
 import { randomBytes } from "node:crypto";
 import { cache } from "react";
 import { cookies, headers } from "next/headers";
-import { prisma } from "@/lib/prisma";
+import { basePrisma as prisma } from "@/lib/prisma-base";
 import { effectivePermissions, type SessionUser } from "@/lib/permissions";
 
 export const SESSION_COOKIE_NAME = "hospital_session";
@@ -14,6 +14,8 @@ function expiryFromNow(days: number) {
 }
 
 export async function createSession(userId: string, opts: { rememberMe?: boolean } = {}) {
+  const membership = await prisma.branchMembership.findFirst({where: {userId, active: true}, orderBy: {branchId: "asc"}});
+  if (!membership) throw new Error("No branch has been assigned to this account.");
   const token = randomBytes(32).toString("hex");
   const days = opts.rememberMe ? REMEMBER_ME_SESSION_DAYS : DEFAULT_SESSION_DAYS;
   const expires = expiryFromNow(days);
@@ -23,6 +25,7 @@ export async function createSession(userId: string, opts: { rememberMe?: boolean
   await prisma.session.create({
     data: {
       sessionToken: token,
+      activeBranchId: membership.branchId,
       userId,
       expires,
       userAgent: requestHeaders.get("user-agent") ?? undefined,
@@ -81,8 +84,13 @@ export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
   }
 
   if (session.user.status !== "ACTIVE") return null;
+  const memberships = await prisma.branchMembership.findMany({where: {userId: session.userId, active: true}});
+  if (!memberships.some(m => m.branchId === session.activeBranchId)) return null;
+  const branches = await prisma.branch.findMany({where: {id: {in: memberships.map(m => m.branchId)}}, select: {id: true, name: true}, orderBy: {name: "asc"}});
 
   return {
+    activeBranchId: session.activeBranchId,
+    branches,
     id: session.user.id,
     name: session.user.name,
     email: session.user.email,

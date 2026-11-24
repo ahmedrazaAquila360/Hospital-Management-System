@@ -1,0 +1,12 @@
+ALTER TABLE "PatientBranch" DROP CONSTRAINT "PatientBranch_patientId_fkey";
+ALTER TABLE "PatientBranch" ADD CONSTRAINT "PatientBranch_patientId_fkey" FOREIGN KEY ("patientId") REFERENCES "Patient"(id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE "BranchMembership" ADD COLUMN "departmentId" text REFERENCES "Department"(id) ON DELETE RESTRICT;
+UPDATE "BranchMembership" m SET "departmentId"=u."departmentId" FROM "User" u WHERE u.id=m."userId" AND m."branchId"='branch-main';
+DROP INDEX "Department_name_key";
+CREATE UNIQUE INDEX "Department_branchId_name_key" ON "Department"("branchId",name);
+DROP INDEX "Service_name_key";
+CREATE UNIQUE INDEX "Service_branchId_name_key" ON "Service"("branchId",name);
+DROP INDEX "Bed_ward_room_label_key";
+CREATE UNIQUE INDEX "Bed_branchId_ward_room_label_key" ON "Bed"("branchId",ward,room,label);
+DROP INDEX "PharmacyBatch_medicationId_lot_key";
+CREATE UNIQUE INDEX "PharmacyBatch_branchId_medicationId_lot_key" ON "PharmacyBatch"("branchId","medicationId",lot);

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { requirePermission } from "@/lib/auth/guard";
+import { assertPermission, requirePermission } from "@/lib/auth/guard";
 import { can } from "@/lib/permissions";
 import { paymentSchema } from "@/lib/validations/invoice";
 import { createAdmission, changeAdmission, postAdmissionDeposit } from "@/server/admissions/transactions";
@@ -35,6 +35,7 @@ export async function housekeeping(form: FormData) {
 
 export async function admit(form: FormData) {
   const user = await requirePermission("ipd.create");
+  assertPermission(user, "ipd.view");
   const data = z
     .object({
       patientCode: identifier,
@@ -61,6 +62,7 @@ export async function admit(form: FormData) {
 export async function updateAdmission(form: FormData) {
   const action = z.enum(["transfer", "request", "discharge","confirm","cancel","activate"]).parse(form.get("action"));
   const actor = await requirePermission(action === "discharge" ? "ipd.approve" : action === "confirm" || action === "cancel" ? "ipd.create" : "ipd.edit");
+  assertPermission(actor, "ipd.view");
   const id = identifier.parse(form.get("id"));
   await changeAdmission(id, action, form, actor.id);
   revalidatePath("/admissions");

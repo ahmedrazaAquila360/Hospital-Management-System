@@ -1,4 +1,7 @@
 import "server-only";
+import { requireUser } from "@/lib/auth/guard";
+import { patientScope } from "@/server/patients/access";
+import { can, requiresPatientAssignment } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { toNumber } from "@/lib/format";
 
@@ -19,6 +22,10 @@ function monthLabel(month: string) {
 }
 
 export async function getDashboardStats(selectedDay?: string, selectedZone?: string) {
+  const actor = await requireUser();
+  const patient = can(actor,"patients.view") ? patientScope(actor) : {id: {in: []}};
+  const visit = !can(actor,"appointments.view") ? {id: {in: []}} : requiresPatientAssignment(actor) ? {dentistId: actor.id} : {};
+  const admission = !can(actor,"ipd.view") && !can(actor,"opd.view") ? {id: {in: []}} : requiresPatientAssignment(actor) ? {doctorId: actor.id} : {};
   const zone = selectedZone ?? await hospitalZone();
   const day = selectedDay ?? calendarDay(zone);
   const { start: today0, end: until } = await calendarBounds(day, day, zone);
@@ -35,26 +42,26 @@ export async function getDashboardStats(selectedDay?: string, selectedZone?: str
     newPatientsThisMonth,
     activeTreatments, opdVisits, admissions, beds, emergencies,
   ] = await Promise.all([
-    prisma.patient.count(),
-    prisma.appointment.count({ where: { date: new Date(day) } }),
-    prisma.appointment.count({ where: { date: new Date(day), status: "COMPLETED" } }),
+    prisma.patient.count({where: patient}),
+    prisma.appointment.count({ where: { ...visit, date: new Date(day) } }),
+    prisma.appointment.count({ where: { ...visit, date: new Date(day), status: "COMPLETED" } }),
     prisma.appointment.count({
       where: {
-        date: new Date(day),
+        ...visit, date: new Date(day),
         status: { in: ["SCHEDULED", "CONFIRMED", "CHECKED_IN", "IN_PROGRESS"] },
       },
     }),
-    prisma.payment.aggregate({ _sum: { amount: true }, where: { date: { gte: today0, lt: until } } }),
-    prisma.invoice.findMany({
+    can(actor,"billing.view") ? prisma.payment.aggregate({ _sum: { amount: true }, where: { date: { gte: today0, lt: until } } }) : Promise.resolve({_sum: {amount: null}}),
+    can(actor,"billing.view") ? prisma.invoice.findMany({
       where: { status: { in: ["UNPAID", "PARTIALLY_PAID"] } },
       select: { total: true, payments: { select: { amount: true } } },
-    }),
-    prisma.patient.count({ where: { createdAt: { gte: month0, lt: monthEnd } } }),
-    prisma.treatment.count({ where: { status: { in: ["PLANNED", "IN_PROGRESS"] } } }),
-    prisma.encounter.count({ where: { appointmentId: { not: null }, checkedInAt: { gte: today0, lt: until } } }),
-    prisma.admission.count({ where: { dischargedAt: null, status: { notIn:["REQUESTED","CANCELLED"] } } }),
-    prisma.bed.groupBy({ by: ["status"], _count: true }),
-    prisma.appointment.findMany({ where: { emergency: true, status: { in: ["CHECKED_IN","IN_PROGRESS"] } }, select: { patientId: true }, distinct: ["patientId"] }),
+    }) : Promise.resolve([]),
+    prisma.patient.count({ where: { ...patient, createdAt: { gte: month0, lt: monthEnd } } }),
+    can(actor,"treatments.view") ? prisma.treatment.count({ where: { patient, status: { in: ["PLANNED", "IN_PROGRESS"] } } }) : Promise.resolve(0),
+    prisma.encounter.count({ where: { appointment: {is: visit}, appointmentId: { not: null }, checkedInAt: { gte: today0, lt: until } } }),
+    prisma.admission.count({ where: { ...admission, dischargedAt: null, status: { notIn:["REQUESTED","CANCELLED"] } } }),
+    can(actor,"ipd.view") ? prisma.bed.groupBy({ by: ["status"], _count: true }) : Promise.resolve([]),
+    prisma.appointment.findMany({ where: { ...visit, emergency: true, status: { in: ["CHECKED_IN","IN_PROGRESS"] } }, select: { patientId: true }, distinct: ["patientId"] }),
   ]);
 
   const outstandingPayments = outstandingInvoices.reduce((sum, inv) => {
@@ -76,6 +83,7 @@ export async function getDashboardStats(selectedDay?: string, selectedZone?: str
 }
 
 export async function getRevenueOverview(months = 6) {
+  if (!can(await requireUser(),"billing.view")) return [];
   const { zone, bounds, buckets } = await monthlyWindow(months);
   const payments = await prisma.payment.findMany({ where: { date: { gte: bounds.start, lt: bounds.end } }, select: { amount: true, date: true } });
   for (const payment of payments) {
@@ -86,10 +94,13 @@ export async function getRevenueOverview(months = 6) {
 }
 
 export async function getAppointmentStats() {
+  if (!can(await requireUser(),"appointments.view")) return [];
+  const actor = await requireUser();
+  const scope = requiresPatientAssignment(actor) ? {dentistId: actor.id} : {};
   const today = calendarDay(await hospitalZone());
   const first = shiftDay(today, -6);
   const appointments = await prisma.appointment.findMany({
-    where: { date: { gte: new Date(first), lt: new Date(shiftDay(today, 1)) } },
+    where: { ...scope, date: { gte: new Date(first), lt: new Date(shiftDay(today, 1)) } },
     select: { date: true, status: true },
   });
   const buckets = new Map<string, { day: string; completed: number; cancelled: number; scheduled: number }>();
@@ -108,8 +119,10 @@ export async function getAppointmentStats() {
 }
 
 export async function getPatientGrowth(months = 6) {
+  if (!can(await requireUser(),"patients.view")) return [];
+  const scope = patientScope(await requireUser());
   const { zone, bounds, buckets } = await monthlyWindow(months);
-  const patients = await prisma.patient.findMany({ where: { createdAt: { gte: bounds.start, lt: bounds.end } }, select: { createdAt: true } });
+  const patients = await prisma.patient.findMany({ where: { ...scope, createdAt: { gte: bounds.start, lt: bounds.end } }, select: { createdAt: true } });
   for (const patient of patients) {
     const key = calendarDay(zone, patient.createdAt).slice(0, 7);
     if (buckets.has(key)) buckets.set(key, buckets.get(key)! + 1);
@@ -118,7 +131,10 @@ export async function getPatientGrowth(months = 6) {
 }
 
 export async function getTreatmentStats() {
+  if (!can(await requireUser(),"treatments.view")) return [];
+  const scope = patientScope(await requireUser());
   const grouped = await prisma.treatment.groupBy({
+    where: {patient: scope},
     by: ["name"],
     _count: { _all: true },
     orderBy: { _count: { name: "desc" } },
@@ -128,6 +144,7 @@ export async function getTreatmentStats() {
 }
 
 export async function getTodayAppointments(day: string, dentistId?: string) {
+  if (!can(await requireUser(),"appointments.view")) return [];
   return prisma.appointment.findMany({
     where: { date: new Date(day), dentistId },
     include: { patient: true, dentist: true },
@@ -137,6 +154,7 @@ export async function getTodayAppointments(day: string, dentistId?: string) {
 }
 
 export async function getUpcomingAppointments(dentistId?: string) {
+  if (!can(await requireUser(),"appointments.view")) return [];
   const tomorrow = new Date(shiftDay(calendarDay(await hospitalZone()), 1));
   return prisma.appointment.findMany({
     where: { dentistId, date: { gte: tomorrow }, status: { in: ["SCHEDULED", "CONFIRMED"] } },
@@ -147,11 +165,13 @@ export async function getUpcomingAppointments(dentistId?: string) {
 }
 
 export async function getRecentPatients(dentistId?: string) {
+  if (!can(await requireUser(),"patients.view")) return [];
   return prisma.patient.findMany({
     where: { archivedAt: null, ...(dentistId && { OR: [{ createdById: dentistId },{ appointments: { some: { dentistId } } },{ admissions: { some: { doctorId: dentistId } } }] }) }, orderBy: { createdAt: "desc" }, take: 6 });
 }
 
 export async function getRecentPayments() {
+  if (!can(await requireUser(),"billing.view")) return [];
   return prisma.payment.findMany({
     include: { patient: true, invoice: true },
     orderBy: { date: "desc" },
@@ -160,6 +180,7 @@ export async function getRecentPayments() {
 }
 
 export async function getOutstandingBalances() {
+  if (!can(await requireUser(),"billing.view")) return [];
   const invoices = await prisma.invoice.findMany({
     where: { status: { in: ["UNPAID", "PARTIALLY_PAID"] } },
     include: { patient: true, payments: { select: { amount: true } } },
@@ -181,6 +202,8 @@ export async function getOutstandingBalances() {
 }
 
 export async function getDepartmentCensus(from: string, through: string) {
+  const actor = await requireUser();
+  if (requiresPatientAssignment(actor) || (!can(actor,"opd.manage") && !can(actor,"ipd.view"))) return [];
   return prisma.$queryRaw<{ name: string; patients: number; visits: number }[]>`
     SELECT d.name, count(DISTINCT v.patient)::int AS patients, count(v.patient)::int AS visits
     FROM "Department" d LEFT JOIN (

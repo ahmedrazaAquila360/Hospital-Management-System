@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const medicineSchema = z.object({
-  medicineName: z.string().min(1, "Medicine name is required"),
+  medicineName: z.string().trim().min(1, "Medicine name is required").max(150),
   route: z.string().max(100).optional(),
   dosage: z.string().min(1, "Dosage is required"),
   frequency: z.string().min(1, "Frequency is required"),
@@ -14,7 +14,7 @@ export const prescriptionSchema = z.object({
   dentistId: z.string().min(1, "Select a dentist"),
   appointmentId: z.string().optional(),
   instructions: z.string().optional(),
-  medicines: z.array(medicineSchema).min(1, "Add at least one medicine"),
+  medicines: z.array(medicineSchema).min(1, "Add at least one medicine").max(20),
 });
 
 export type PrescriptionInput = z.infer<typeof prescriptionSchema>;

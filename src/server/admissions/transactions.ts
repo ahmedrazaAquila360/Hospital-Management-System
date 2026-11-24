@@ -1,4 +1,5 @@
 import "server-only";
+import { doctorDepartment } from "@/server/branches/department";
 import { z } from "zod";
 import { Prisma } from "@/generated/prisma/client";
 import type { PaymentMethod } from "@/generated/prisma/enums";
@@ -11,9 +12,10 @@ export async function createAdmission(data: { patientCode: string; doctorId: str
   return prisma.$transaction(async (tx) => {
     const patient = await tx.patient.findUniqueOrThrow({ where: { patientCode: data.patientCode, archivedAt: null } });
     const doctor = await tx.user.findFirstOrThrow({
-      where: { id: data.doctorId, status: "ACTIVE", department: { active: true }, role: { name: "DENTIST" } },
+      where: { id: data.doctorId, status: "ACTIVE", role: { name: "DENTIST" }, branchMemberships: {some: {active: true}} },
     });
-    if (!doctor.departmentId) throw new Error("Assign the doctor to a department first.");
+    const department = await doctorDepartment(tx,doctor.id,doctor.departmentId);
+    if (!department) throw new Error("Assign the doctor to a department first.");
     const bed = await tx.bed.update({
       where: { id: data.bedId, status: "AVAILABLE" },
       data: { status: requestOnly ? "RESERVED" : "OCCUPIED" },
@@ -22,7 +24,7 @@ export async function createAdmission(data: { patientCode: string; doctorId: str
       data: {
         patientId: patient.id,
         doctorId: doctor.id,
-        departmentId: doctor.departmentId,
+        departmentId: department.id,
         bedId: data.bedId,
         diagnosis: data.diagnosis, status: requestOnly ? "REQUESTED" : "ADMITTED",
       },

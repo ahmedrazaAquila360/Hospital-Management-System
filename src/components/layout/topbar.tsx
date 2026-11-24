@@ -1,5 +1,6 @@
 "use client";
 
+import { switchBranch } from "@/server/branches/actions";
 import { usePathname } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
@@ -49,6 +50,10 @@ export function Topbar({ user }: { user: SessionUser }) {
       </div>
 
       <div className="ml-auto flex items-center gap-2 sm:gap-3">
+        {user.branches && user.branches.length > 0 && <form action={switchBranch} className="flex items-center gap-1">
+          <select name="branchId" aria-label="Active branch" defaultValue={user.activeBranchId} className="max-w-36 rounded-md border p-1 text-sm">{user.branches.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}</select>
+          {user.branches.length > 1 && <button className="text-sm underline" type="submit">Switch</button>}
+        </form>}
         <GlobalSearch />
         <NotificationBell />
         <div className="bg-border hidden h-8 w-px md:block" aria-hidden />

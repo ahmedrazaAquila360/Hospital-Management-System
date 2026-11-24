@@ -1,5 +1,6 @@
 import "server-only";
 import { requiresPatientAssignment } from "@/lib/permissions";
+import { doctorDepartment } from "@/server/branches/department";
 import type { Prisma } from "@/generated/prisma/client";
 import { appointmentInstant } from "./clock";
 import { hospitalZone } from "@/server/reports/calendar";
@@ -43,7 +44,7 @@ function parseForm(formData: FormData) {
 async function hoursError(date: string, start: string, end: string, doctorId: string, excludeId?: string): Promise<AppointmentFormState | null> {
   const [hospitalHours, doctor, overlap] = await Promise.all([
     getWorkingHours(),
-    prisma.user.findFirst({ where: { id: doctorId, status: "ACTIVE", role: { name: "DENTIST" } }, select: { doctorProfile: true } }),
+    prisma.user.findFirst({ where: { id: doctorId, status: "ACTIVE", role: { name: "DENTIST" }, branchMemberships: {some: {active: true}} }, select: { doctorProfile: true } }),
     prisma.appointment.findFirst({ where: { dentistId: doctorId, id: { not: excludeId }, status: { in: ["SCHEDULED", "CHECKED_IN", "CONFIRMED", "IN_PROGRESS"] },
       startTime: { lt: await appointmentInstant(date,end) }, endTime: { gt: await appointmentInstant(date,start) } }, select: { id: true } }),
   ]);
@@ -91,7 +92,7 @@ export async function createAppointment(user: SessionUser, _prev: AppointmentFor
       data: {
         patientId: data.patientId,
         dentistId: data.dentistId,
-        departmentId: dentist.departmentId,
+        departmentId: (await doctorDepartment(tx,dentist.id,dentist.departmentId))?.id,
         walkIn, emergency: formData.get("emergency") === "on",
         ...(walkIn && { status: "CHECKED_IN", encounter: { create: {} } }),
         date: new Date(data.date),
@@ -161,7 +162,7 @@ export async function updateAppointment(
   const appointment = await tx.appointment.update({
     where: { id, status: existing.status, startTime: existing.startTime, endTime: existing.endTime, ...(requiresPatientAssignment(user) && { dentistId: user.id }) },
     data: {
-      departmentId: existing?.dentistId === data.dentistId ? existing.departmentId : assignedDoctor.departmentId,
+      departmentId: existing?.dentistId === data.dentistId ? existing.departmentId : (await doctorDepartment(tx,data.dentistId,assignedDoctor.departmentId))?.id,
       patientId: data.patientId,
       dentistId: data.dentistId,
       date: new Date(data.date),
