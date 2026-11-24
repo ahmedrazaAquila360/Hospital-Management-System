@@ -241,6 +241,7 @@ model Session {
 // ---------------------------------------------------------------------------
 
 model Patient {
+  guardianAlerts RevenueAlert[]
   branches PatientBranch[]
   archivedAt            DateTime?
   admissions            Admission[]
@@ -488,6 +489,10 @@ model PrescriptionMedicine {
 // ---------------------------------------------------------------------------
 
 model Invoice {
+  requestId String?
+  requestHash String?
+  authorization Json?
+  @@unique([branchId, requestId])
   branch Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
   branchId String @default(dbgenerated("hospital_current_branch()"))
   @@index([branchId])
@@ -621,6 +626,7 @@ model Notification {
 }
 
 model ClinicSettings {
+  guardianConfig Json?
   branches           Branch[]
   registrationNumber String?
   id                 String   @id @default(cuid())
@@ -889,6 +895,7 @@ model BedStay {
 }
 
 model Branch {
+  guardianAlerts RevenueAlert[]
   appointmentRows Appointment[]
   appointmentRequestRows AppointmentRequest[]
   treatmentRows Treatment[]
@@ -953,4 +960,33 @@ model PatientBranch {
   patientId String
   branchId String
   @@id([patientId, branchId])
+}
+
+enum RevenueAlertStatus {
+  OPEN
+  REVIEWED
+  RESOLVED
+  DISMISSED
+}
+model RevenueAlert {
+  id String @id @default(cuid())
+  branchId String
+  branch Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  patientId String?
+  patient Patient? @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  rule String
+  sourceId String
+  evidence Json
+  impact Decimal? @db.Decimal(10,2)
+  severity String
+  status RevenueAlertStatus @default(OPEN)
+  assignedToId String?
+  reviewedById String?
+  reviewedAt DateTime?
+  resolvedAt DateTime?
+  dismissedReason String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([branchId,rule,sourceId])
+  @@index([branchId,status,createdAt])
 }

@@ -2,16 +2,16 @@ import { z } from "zod";
 
 export const invoiceItemSchema = z.object({
   description: z.string().min(1, "Description is required"),
-  quantity: z.coerce.number().int().min(1),
-  unitPrice: z.coerce.number().min(0),
+  quantity: z.coerce.number().int().min(1).max(1000000),
+  unitPrice: z.coerce.number().min(0).max(99999999.99).multipleOf(0.01),
   treatmentId: z.string().optional(),
 });
 
 export const invoiceSchema = z.object({
   patientId: z.string().min(1, "Select a patient"),
   dentistId: z.string().optional(),
-  discount: z.coerce.number().min(0).default(0),
-  tax: z.coerce.number().min(0).default(0),
+  discount: z.coerce.number().min(0).max(99999999.99).multipleOf(0.01).default(0),
+  tax: z.coerce.number().min(0).max(99999999.99).multipleOf(0.01).default(0),
   notes: z.string().optional(),
   items: z.array(invoiceItemSchema).min(1, "Add at least one line item"),
 });

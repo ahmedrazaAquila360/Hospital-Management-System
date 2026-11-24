@@ -110,6 +110,8 @@ export const PERMISSION_CATALOG = [
     label: "Billing",
     actions: [
       { action: "view", label: "View", description: "Invoices, payments, invoice print and PDF." },
+      { action: "guardian", label: "Revenue Guardian", description: "View and review branch revenue exceptions." },
+      { action: "guardianManage", label: "Guardian configuration", description: "Scan and configure branch revenue exception rules." },
       { action: "create", label: "Create", description: "Create invoices." },
       { action: "refund", label: "Refund", description: "Post an auditable refund against a received payment." },
       { action: "discount", label: "Discount", description: "Authorize invoice discounts." },
@@ -206,7 +208,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<BuiltInRole, PermissionKey[]> = {
     ...keys("notifications.view", "settings.view"),
   ],
   PHARMACIST: all("pharmacy"),
-  CASHIER: keys("billing.view", "billing.payments"),
+  CASHIER: keys("billing.view", "billing.payments", "billing.guardian"),
   BILLING_OFFICER: all("billing"),
   NURSE: keys("ipd.view","ipd.edit"),
   DEPARTMENT_MANAGER: keys("settings.view"),

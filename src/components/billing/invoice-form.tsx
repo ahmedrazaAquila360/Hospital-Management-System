@@ -63,6 +63,7 @@ export function InvoiceForm({
   defaultItem?: { description: string; unitPrice: number; treatmentId: string };
 }) {
   const [state, formAction] = useActionState(action, {});
+  const requestId = useRef<string>("");
   const [rows, setRows] = useState<ItemRow[]>(
     defaultItem
       ? [{ key: 0, description: defaultItem.description, quantity: "1", unitPrice: String(defaultItem.unitPrice), treatmentId: defaultItem.treatmentId }]
@@ -107,6 +108,9 @@ export function InvoiceForm({
 
   const submit = submitWithoutReset(formAction);
   function onSubmit(event: FormEvent<HTMLFormElement>) {
+    requestId.current ||= crypto.randomUUID();
+    const token = event.currentTarget.elements.namedItem("requestId") as HTMLInputElement;
+    token.value = requestId.current;
     if (!new FormData(event.currentTarget).get("patientId")) {
       event.preventDefault();
       setPatientMissing(true);
@@ -121,6 +125,7 @@ export function InvoiceForm({
       onSubmit={onSubmit}
       className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_23rem]"
     >
+      <input type="hidden" name="requestId" defaultValue="" />
       {/* Amounts the server action reads. */}
       <input type="hidden" name="discount" value={discount} />
       <input type="hidden" name="tax" value={tax} />
