@@ -1,9 +1,11 @@
+import {stockContext} from "./stock-context";
 import "server-only";
 import { prisma } from "@/lib/prisma";
 
 /** Internal transaction: caller authorizes pharmacy.edit and validates input. */
 export async function returnDispensedStock(data: { fillId: string; quantity: number; reason: string; expectedReturned: number; restock: boolean }, actorId: string) {
   return prisma.$transaction(async (tx) => {
+    await stockContext(tx,actorId,"SALE_RETURN",data.fillId,data.reason);
     await tx.$queryRaw`SELECT id FROM "Dispensing" WHERE id = ${data.fillId} FOR UPDATE`;
     const fill = await tx.dispensing.findUniqueOrThrow({
       where: { id: data.fillId },

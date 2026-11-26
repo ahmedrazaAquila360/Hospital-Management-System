@@ -179,6 +179,9 @@ model UserPermission {
 }
 
 model User {
+  attendanceShifts AttendanceShift[]
+  vitalObservations VitalObservation[]
+  vitalReviews VitalReview[]
   emergencyCases EmergencyCase[]
   branchMemberships BranchMembership[]
   doctorProfile DoctorProfile?
@@ -236,6 +239,14 @@ model Session {
   createdAt    DateTime @default(now())
 
   @@index([userId])
+}
+
+model LoginThrottle {
+ key String @id
+ failures Int @default(0)
+ windowStartedAt DateTime @default(now())
+ lockedUntil DateTime?
+ updatedAt DateTime @updatedAt
 }
 
 // ---------------------------------------------------------------------------
@@ -497,6 +508,10 @@ model PrescriptionMedicine {
 // ---------------------------------------------------------------------------
 
 model Invoice {
+  @@index([branchId,voidedAt])
+  voidedAt DateTime?
+  voidedById String?
+  voidReason String?
   approvalRequests FinancialApproval[]
   requestId String?
   requestHash String?
@@ -715,6 +730,7 @@ model Department {
 }
 
 model Encounter {
+  vitalObservations VitalObservation[]
   branch Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
   branchId String @default(dbgenerated("hospital_current_branch()"))
   @@index([branchId])
@@ -873,6 +889,7 @@ model Medication {
 }
 
 model PharmacyBatch {
+  movements StockMovement[]
   branch Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
   branchId String @default(dbgenerated("hospital_current_branch()"))
   @@index([branchId])
@@ -935,6 +952,11 @@ model BedStay {
 }
 
 model Branch {
+  suppliers Supplier[]
+  stockMovements StockMovement[]
+  attendanceShifts AttendanceShift[]
+  vitalObservations VitalObservation[]
+  vitalReviews VitalReview[]
   financialApprovals FinancialApproval[]
   serviceCharges ServiceCharge[]
   emergencyCases EmergencyCase[]
@@ -1166,4 +1188,78 @@ model EmergencyCase {
  closedAt DateTime?
  @@index([branchId,status,registeredAt])
  @@index([patientId,registeredAt])
+}
+
+model VitalObservation {
+ id String @id @default(cuid())
+ branchId String @default(dbgenerated("hospital_current_branch()"))
+ branch Branch @relation(fields:[branchId],references:[id],onDelete:Restrict)
+ encounterId String
+ encounter Encounter @relation(fields:[encounterId],references:[id],onDelete:Restrict)
+ authorId String
+ author User @relation(fields:[authorId],references:[id],onDelete:Restrict)
+ observedAt DateTime
+ createdAt DateTime @default(now())
+ values Json
+ correctionOfId String? @unique
+ correctionOf VitalObservation? @relation("VitalCorrection",fields:[correctionOfId],references:[id],onDelete:Restrict)
+ correction VitalObservation? @relation("VitalCorrection")
+ reason String?
+ reviews VitalReview[]
+ @@index([branchId,encounterId,observedAt])
+}
+model VitalReview {
+ id String @id @default(cuid())
+ branchId String @default(dbgenerated("hospital_current_branch()"))
+ branch Branch @relation(fields:[branchId],references:[id],onDelete:Restrict)
+ observationId String
+ observation VitalObservation @relation(fields:[observationId],references:[id],onDelete:Restrict)
+ reviewerId String
+ reviewer User @relation(fields:[reviewerId],references:[id],onDelete:Restrict)
+ createdAt DateTime @default(now())
+ note String
+ @@index([branchId,observationId,createdAt])
+}
+
+model AttendanceShift {
+ id String @id @default(cuid())
+ branchId String @default(dbgenerated("hospital_current_branch()"))
+ branch Branch @relation(fields:[branchId],references:[id],onDelete:Restrict)
+ userId String
+ user User @relation(fields:[userId],references:[id],onDelete:Restrict)
+ scheduledStart DateTime?
+ scheduledEnd DateTime?
+ checkedInAt DateTime?
+ checkedOutAt DateTime?
+ createdAt DateTime @default(now())
+ @@index([branchId,userId,createdAt])
+}
+
+model Supplier {
+ id String @id @default(cuid())
+ branchId String @default(dbgenerated("hospital_current_branch()"))
+ branch Branch @relation(fields:[branchId],references:[id],onDelete:Restrict)
+ name String
+ phone String?
+ email String?
+ address String?
+ active Boolean @default(true)
+ @@unique([branchId,name])
+}
+model StockMovement {
+ id String @id @default(dbgenerated("gen_random_uuid()::text"))
+ branchId String @default(dbgenerated("hospital_current_branch()"))
+ branch Branch @relation(fields:[branchId],references:[id],onDelete:Restrict)
+ batchId String
+ batch PharmacyBatch @relation(fields:[batchId],references:[id],onDelete:Restrict)
+ actorId String?
+ kind String
+ sourceId String?
+ reason String?
+ before Int
+ after Int
+ quantity Int
+ purchasePrice Decimal @db.Decimal(10,2)
+ createdAt DateTime @default(now())
+ @@index([branchId,batchId,createdAt])
 }

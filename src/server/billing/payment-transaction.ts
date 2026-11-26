@@ -14,6 +14,7 @@ export async function postInvoicePayment(data: PaymentInput & { requestId: strin
       include: { payments: true, patient: true },
     });
     if (!invoice) return { error: "Invoice not found." };
+    if (invoice.voidedAt) return {error:"This invoice has been voided."};
 
     const amount = new Prisma.Decimal(data.amount);
     const prior = invoice.payments.find(p => p.requestId === data.requestId);

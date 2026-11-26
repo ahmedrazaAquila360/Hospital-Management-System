@@ -22,7 +22,7 @@ export async function createManualInvoice(input: InvoiceInput, requestId: string
     for(const id of [...ids].sort()){
       await tx.$queryRaw`SELECT id FROM "Treatment" WHERE id=${id} FOR UPDATE`;
       await tx.treatment.findFirstOrThrow({where:{id,patientId:data.patientId,status:{not:"CANCELLED"}}});
-      if(await tx.invoiceItem.findFirst({where:{treatmentId:id}}))throw new Error("This treatment has already been billed.");
+      if(await tx.invoiceItem.findFirst({where:{treatmentId:id,invoice:{voidedAt:null}}}))throw new Error("This treatment has already been billed.");
     }
     const items=data.items.map(i=>({...i,unitPrice:new Prisma.Decimal(i.unitPrice),amount:new Prisma.Decimal(i.unitPrice).mul(i.quantity)}));
     const subtotal=items.reduce((sum,i)=>sum.plus(i.amount),new Prisma.Decimal(0));

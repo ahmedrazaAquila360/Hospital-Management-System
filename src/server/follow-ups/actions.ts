@@ -7,12 +7,10 @@ import {calendarDay} from "@/lib/report-calendar";
 import {hospitalZone} from "@/server/reports/calendar";
 import {patientScope} from "@/server/patients/access";
 export async function setFollowUpConsent(form:FormData){
- const actor=await requirePermission("patients.edit");const id=z.string().min(1).parse(form.get("patientId"));const consent=form.get("consent")==="on";
- await prisma.$transaction(async tx=>{await tx.patient.update({where:{id,AND:[patientScope(actor)]},data:{reminderConsent:consent}});if(!consent)await tx.followUp.updateMany({where:{patientId:id,status:"DUE"},data:{status:"OPTED_OUT"}});await tx.activityLog.create({data:{userId:actor.id,action:"REMINDER_CONSENT",entityType:"Patient",entityId:id,metadata:{consent}}});});revalidatePath("/follow-ups");
+ const actor=await requirePermission("patients.edit");const {changeReminderConsent}=await import('./service');await changeReminderConsent(String(form.get('patientId')),form.get('consent')==='on',actor);revalidatePath('/follow-ups');
 }
 export async function updateFollowUp(form:FormData){
- const actor=await requirePermission("appointments.edit");const data=z.object({id:z.string().min(1),status:z.enum(["BOOKED","COMPLETED","OPTED_OUT","CANCELLED"])}).parse(Object.fromEntries(form));
- await prisma.$transaction(async tx=>{const before=await tx.followUp.findFirstOrThrow({where:{id:data.id,patient:patientScope(actor)}});if(before.status!=="DUE"&&before.status!=="BOOKED")throw new Error("Follow-up is no longer open.");await tx.followUp.update({where:{id:data.id,status:before.status},data:{status:data.status}});await tx.activityLog.create({data:{userId:actor.id,action:"FOLLOW_UP",entityType:"FollowUp",entityId:data.id,metadata:{before:before.status,after:data.status}}});});revalidatePath("/follow-ups");
+ const actor=await requirePermission("appointments.edit");const data=z.object({id:z.string().min(1),status:z.enum(["BOOKED","COMPLETED","OPTED_OUT","CANCELLED"])}).parse(Object.fromEntries(form));const {changeFollowUp}=await import('./service');await changeFollowUp(data,actor);revalidatePath('/follow-ups');
 }
 export async function generateInternalReminders(){
  const actor=await requirePermission("appointments.edit");const day=calendarDay(await hospitalZone());

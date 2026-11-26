@@ -10,7 +10,7 @@ export default async function FinancialApprovals(){
  const actor=await requirePermission("billing.view");
  const [requests,invoices]=await Promise.all([
   prisma.financialApproval.findMany({orderBy:{requestedAt:"desc"},take:100,include:{invoice:{select:{invoiceNumber:true,patient:{select:{patientCode:true}}}}}}),
-  prisma.invoice.findMany({where:{status:{in:["UNPAID","PARTIALLY_PAID","PAID"]}},select:{id:true,invoiceNumber:true,total:true,patient:{select:{patientCode:true}}},orderBy:{date:"desc"},take:200}),
+  prisma.invoice.findMany({where:{status:{in:["UNPAID","PARTIALLY_PAID","PAID"]},voidedAt:null},select:{id:true,invoiceNumber:true,total:true,patient:{select:{patientCode:true}}},orderBy:{date:"desc"},take:200}),
  ]);
  const users=await prisma.user.findMany({where:{id:{in:requests.map(r=>r.requestedById)}},select:{id:true,name:true}});
  const names=new Map(users.map(u=>[u.id,u.name]));

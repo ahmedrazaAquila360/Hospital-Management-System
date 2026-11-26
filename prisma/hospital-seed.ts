@@ -4,6 +4,7 @@ import { prisma } from "../src/lib/prisma";
 import { BUILT_IN_ROLES, PERMISSIONS, DEFAULT_ROLE_PERMISSIONS } from "../src/lib/permissions";
 
 async function seed() {
+  if (process.env.NODE_ENV === "production") throw new Error("Synthetic seeding is disabled in production.");
   const password = process.env.HOSPITAL_DEMO_PASSWORD;
   if (!password || password.length < 16)
     throw new Error("Set HOSPITAL_DEMO_PASSWORD to at least 16 characters for the development accounts.");

@@ -13,6 +13,7 @@ export async function applyInvoiceRefund(tx:Prisma.TransactionClient,data: { inv
     await tx.$queryRaw`SELECT id FROM "Invoice" WHERE id = ${data.invoiceId} FOR UPDATE`;
     const invoice = await tx.invoice.findUnique({ where: { id: data.invoiceId }, include: { payments: true } });
     if (!invoice) return { error: "Invoice not found." };
+    if (invoice.voidedAt) return {error:"This invoice has been voided."};
     const amount = new Prisma.Decimal(data.amount).neg();
     const prior = invoice.payments.find(p => p.requestId === data.requestId);
     if (prior) {

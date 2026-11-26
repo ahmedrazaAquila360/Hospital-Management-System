@@ -21,12 +21,12 @@ export async function updateEmergencyCase(data:EmergencyUpdate,actor:SessionUser
   }
   if(data.transferType==="OPD"){
    if(!data.targetId)throw new Error("Select the checked-in appointment to transfer into OPD.");
-   await tx.appointment.findFirstOrThrow({where:{id:data.targetId,patientId:before.patientId,status:{in:["CHECKED_IN","IN_PROGRESS"]}},select:{id:true}});
+   await tx.appointment.findFirstOrThrow({where:{id:data.targetId,patientId:before.patientId,status:{in:["CHECKED_IN","IN_PROGRESS"]},encounter:{isNot:null}},select:{id:true}});
    change.appointmentId=data.targetId;change.status="OPD_TRANSFERRED";
   }
   if(data.transferType==="IPD"){
    if(!data.targetId)throw new Error("Select the active admission to transfer into IPD.");
-   await tx.admission.findFirstOrThrow({where:{id:data.targetId,patientId:before.patientId,status:{in:["ADMITTED","ACTIVE","TRANSFERRED"]}},select:{id:true}});
+   await tx.admission.findFirstOrThrow({where:{id:data.targetId,patientId:before.patientId,status:{in:["ADMITTED","ACTIVE","TRANSFERRED"]},encounter:{isNot:null}},select:{id:true}});
    change.admissionId=data.targetId;change.status="IPD_TRANSFERRED";
   }
   if(data.transferType==="CLOSE"){change.status="CLOSED";change.closedAt=new Date();}

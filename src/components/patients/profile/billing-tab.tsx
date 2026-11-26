@@ -31,7 +31,7 @@ export function BillingTab({ patient }: { patient: Patient }) {
       <CardContent className="divide-y p-0">
         {patient.invoices.map((inv) => {
           const paid = inv.payments.reduce((s, p) => s + toNumber(p.amount), 0);
-          const remaining = toNumber(inv.total) - paid;
+          const remaining = inv.voidedAt ? 0 : toNumber(inv.total) - paid;
           return (
             <Link
               key={inv.id}
@@ -49,7 +49,7 @@ export function BillingTab({ patient }: { patient: Patient }) {
                   <p className="font-medium">{formatCurrency(inv.total)}</p>
                   {remaining > 0 && <p className="text-destructive text-xs">{formatCurrency(remaining)} due</p>}
                 </div>
-                <StatusBadge status={inv.status} tone={INVOICE_STATUS_TONE[inv.status]} />
+                <StatusBadge status={inv.voidedAt?"VOIDED":inv.status} tone={INVOICE_STATUS_TONE[inv.voidedAt?"VOIDED":inv.status]} />
               </div>
             </Link>
           );

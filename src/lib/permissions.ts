@@ -31,6 +31,15 @@ type ActionDef = { action: string; label: string; description: string };
 
 /** Modules, the actions each one supports, and what each action controls. */
 export const PERMISSION_CATALOG = [
+  { module: "attendance", label: "Attendance", actions: [
+    { action: "view", label: "View own", description: "Read own shifts and check in or out." },
+    { action: "manage", label: "Manage", description: "Schedule staff shifts and audit corrections." },
+  ] },
+  { module: "vitals", label: "Vital observations", actions: [
+    { action: "view", label: "View", description: "View authorized encounter vital signs." },
+    { action: "create", label: "Record", description: "Record timestamped vital observations and corrections." },
+    { action: "review", label: "Review", description: "Append clinical review to vital observations." },
+  ] },
   { module: "emergency", label: "Emergency", actions: [
     { action: "view", label: "View", description: "View assigned emergency cases." },
     { action: "create", label: "Register", description: "Register an emergency case for a patient." },
@@ -124,6 +133,7 @@ export const PERMISSION_CATALOG = [
       { action: "payments", label: "Record Payment", description: "Record full or partial payments on invoices." },
       { action: "shifts", label: "Cashier shifts", description: "Open, submit and view own cashier reconciliation." },
       { action: "shiftApprove", label: "Approve cashier close", description: "Review and approve submitted cashier reconciliation." },
+      { action: "void", label: "Void invoice", description: "Void an unpaid manual invoice with a reason; retain its history." },
     ],
   },
   {
@@ -197,6 +207,8 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<BuiltInRole, PermissionKey[]> = {
   // (enforced in the permission and staff actions).
   ADMIN: ALL_PERMISSION_KEYS,
   DENTIST: [
+    ...keys("attendance.view"),
+    ...all("vitals"),
     ...keys("emergency.view", "emergency.edit"),
     ...keys("opd.view", "opd.edit", "lab.create"),
     ...all("dashboard"),
@@ -209,6 +221,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<BuiltInRole, PermissionKey[]> = {
     ...keys("notifications.view", "settings.view"),
   ],
   RECEPTIONIST: [
+    ...keys("attendance.view"),
     ...keys("emergency.view", "emergency.create"),
     ...all("dashboard"),
     ...keys("patients.view", "patients.create", "patients.edit"),
@@ -217,14 +230,14 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<BuiltInRole, PermissionKey[]> = {
     ...all("documents"),
     ...keys("notifications.view", "settings.view"),
   ],
-  PHARMACIST: all("pharmacy"),
-  CASHIER: keys("billing.view", "billing.payments", "billing.guardian", "billing.shifts"),
-  BILLING_OFFICER: all("billing"),
-  NURSE: keys("ipd.view","ipd.edit","emergency.view","emergency.edit"),
-  DEPARTMENT_MANAGER: keys("settings.view"),
-  INVENTORY_MANAGER: keys("pharmacy.view","pharmacy.manage"),
-  LAB_TECH: keys("lab.view", "lab.edit", "notifications.view", "settings.view"),
-  STAFF: [...keys("dashboard.view", "patients.view", "appointments.view", "notifications.view", "settings.view"), ...all("documents")],
+  PHARMACIST: [...all("pharmacy"), ...keys("attendance.view")],
+  CASHIER: keys("attendance.view","billing.view", "billing.payments", "billing.guardian", "billing.shifts"),
+  BILLING_OFFICER: [...all("billing"), ...keys("attendance.view")],
+  NURSE: keys("attendance.view","ipd.view","ipd.edit","emergency.view","emergency.edit","vitals.view","vitals.create"),
+  DEPARTMENT_MANAGER: keys("attendance.view","settings.view"),
+  INVENTORY_MANAGER: keys("attendance.view","pharmacy.view","pharmacy.manage"),
+  LAB_TECH: keys("attendance.view","lab.view", "lab.edit", "notifications.view", "settings.view"),
+  STAFF: [...keys("attendance.view","dashboard.view", "patients.view", "appointments.view", "notifications.view", "settings.view"), ...all("documents")],
 };
 
 export function isBuiltInRole(name: string): name is BuiltInRole {

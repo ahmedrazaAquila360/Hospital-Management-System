@@ -3,7 +3,7 @@ import { prisma } from "../src/lib/prisma";
 import { BUILT_IN_ROLES, DEFAULT_ROLE_PERMISSIONS, PERMISSIONS } from "../src/lib/permissions";
 import { ToothCondition } from "../src/generated/prisma/enums";
 
-const DEMO_PASSWORD = "Password123!";
+const DEMO_PASSWORD = process.env.HOSPITAL_DEMO_PASSWORD;
 
 
 const FDI_TEETH = [
@@ -39,6 +39,8 @@ function money(n: number) {
 }
 
 async function main() {
+  if (process.env.NODE_ENV === "production") throw new Error("Synthetic seed is disabled in production.");
+  if (!DEMO_PASSWORD || DEMO_PASSWORD.length < 16) throw new Error("Set HOSPITAL_DEMO_PASSWORD to at least 16 characters for development seeding.");
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
@@ -506,7 +508,7 @@ async function main() {
   });
 
   console.log("\nSeed complete.\n");
-  console.log("Demo login credentials (password for all accounts: %s)\n", DEMO_PASSWORD);
+  console.log("Synthetic development accounts are ready. Use the configured HOSPITAL_DEMO_PASSWORD.");
   const table = [
     ["Super Admin", superAdmin.email],
     ["Admin", admin.email],

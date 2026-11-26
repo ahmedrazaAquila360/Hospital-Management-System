@@ -67,7 +67,7 @@ export async function listPatients(filters: PatientListFilters) {
           select: { status: true, dentist: true, cost: true, discount: true },
         },
         invoices: {
-          where: can(actor,"billing.view") ? {} : { id: { in: [] } },
+          where: can(actor,"billing.view") ? {voidedAt:null} : { id: { in: [] } },
           select: { total: true, payments: { select: { amount: true } } },
         },
       },

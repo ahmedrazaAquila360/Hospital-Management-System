@@ -7,6 +7,7 @@ import { verifyPassword } from "@/lib/auth/password";
 import { createSession, destroySession, getSessionUser } from "@/lib/auth/session";
 import { loginSchema } from "@/lib/validations/auth";
 import { forgotPasswordSchema } from "@/lib/validations/forgot-password";
+import {loginIsThrottled,recordFailedLogin,clearFailedLogins} from "./login-throttle";
 
 export type LoginActionState = {
   error?: string;
@@ -31,20 +32,27 @@ export async function loginAction(_prev: LoginActionState, formData: FormData): 
 
   const { email, password, remember } = parsed.data;
 
+  if(await loginIsThrottled(email))return {error:"Too many sign-in attempts. Try again later."};
+
   // passwordHash is omitted globally (src/lib/prisma.ts); sign-in is one of two places that needs it.
   const user = await basePrisma.user.findUnique({ where: { email }, omit: { passwordHash: false } });
   if (!user) {
+    await recordFailedLogin(email);
     return { error: "Invalid email or password." };
   }
 
   if (user.status !== "ACTIVE") {
-    return { error: "This account has been deactivated. Contact an administrator." };
+    await recordFailedLogin(email);
+    return { error: "Invalid email or password." };
   }
 
   const valid = await verifyPassword(password, user.passwordHash);
   if (!valid) {
+    await recordFailedLogin(email);
     return { error: "Invalid email or password." };
   }
+
+  await clearFailedLogins(email);
 
   await createSession(user.id, { rememberMe: remember });
   await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });

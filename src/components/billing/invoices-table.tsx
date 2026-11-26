@@ -52,7 +52,7 @@ export function InvoicesTable({ rows, filtered }: { rows: InvoiceRow[]; filtered
           </thead>
           <tbody className="divide-border/60 divide-y">
             {rows.map((inv) => {
-              const remaining = Math.max(0, inv.total - inv.paid);
+              const remaining = inv.status === "VOIDED" ? 0 : Math.max(0, inv.total - inv.paid);
               return (
                 <tr key={inv.id} className="hover:bg-pale/40 transition-colors">
                   <td className="py-3 pr-3 pl-5">
@@ -84,7 +84,7 @@ export function InvoicesTable({ rows, filtered }: { rows: InvoiceRow[]; filtered
 
       <ul className="divide-border/60 divide-y @4xl:hidden">
         {rows.map((inv) => {
-          const remaining = Math.max(0, inv.total - inv.paid);
+          const remaining = inv.status === "VOIDED" ? 0 : Math.max(0, inv.total - inv.paid);
           return (
             <li key={inv.id} className="flex flex-col gap-3 px-4 py-4 sm:px-5">
               <div className="flex items-start justify-between gap-3">

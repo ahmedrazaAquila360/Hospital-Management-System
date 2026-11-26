@@ -53,7 +53,7 @@ export async function getDashboardStats(selectedDay?: string, selectedZone?: str
     }),
     can(actor,"billing.view") ? prisma.payment.aggregate({ _sum: { amount: true }, where: { date: { gte: today0, lt: until } } }) : Promise.resolve({_sum: {amount: null}}),
     can(actor,"billing.view") ? prisma.invoice.findMany({
-      where: { status: { in: ["UNPAID", "PARTIALLY_PAID"] } },
+      where: { status: { in: ["UNPAID", "PARTIALLY_PAID"] },voidedAt:null },
       select: { total: true, payments: { select: { amount: true } } },
     }) : Promise.resolve([]),
     prisma.patient.count({ where: { ...patient, createdAt: { gte: month0, lt: monthEnd } } }),
@@ -182,7 +182,7 @@ export async function getRecentPayments() {
 export async function getOutstandingBalances() {
   if (!can(await requireUser(),"billing.view")) return [];
   const invoices = await prisma.invoice.findMany({
-    where: { status: { in: ["UNPAID", "PARTIALLY_PAID"] } },
+    where: { status: { in: ["UNPAID", "PARTIALLY_PAID"] },voidedAt:null },
     include: { patient: true, payments: { select: { amount: true } } },
     orderBy: { date: "desc" },
     take: 6,

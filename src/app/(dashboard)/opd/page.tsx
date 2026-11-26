@@ -119,6 +119,7 @@ export default async function Outpatients({ searchParams }: { searchParams: Prom
           <CardTitle>Clinical history</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
+          {can(doctor,"vitals.view")&&<Link className="underline" href={`/vitals?visit=${visit}`}>Timestamped vital observations and review history</Link>}
           <p>Recorded allergies · {patient.allergies || "No information recorded"}</p>
           <p>Current medications · {patient.currentMedications || "No information recorded"}</p>
           {history.map((n) => (

@@ -27,6 +27,10 @@ async function main(){
   await assert.rejects(()=>updateEmergencyCase({id:opd.id,categoryId:category.id,transferType:"NONE"},actor));
   await assert.rejects(()=>updateEmergencyCase({id:opd.id,transferType:"OPD",targetId:otherAppointment.id},actor));
   await updateEmergencyCase({id:opd.id,clinicianId:doctor.id,transferType:"NONE"},actor);
+  await assert.rejects(()=>updateEmergencyCase({id:opd.id,transferType:"OPD",targetId:appointment.id},actor));
+  await assert.rejects(()=>updateEmergencyCase({id:ipd.id,transferType:"IPD",targetId:admission.id},actor));
+  await prisma.encounter.create({data:{appointmentId:appointment.id}});
+  await prisma.encounter.create({data:{admissionId:admission.id}});
   await assert.rejects(()=>updateEmergencyCase({id:opd.id,clinicianId:admin.id,transferType:"NONE"},clinician),/cannot reassign/);
   await updateEmergencyCase({id:opd.id,transferType:"OPD",targetId:appointment.id},clinician);
   assert.equal((await prisma.emergencyCase.findUniqueOrThrow({where:{id:opd.id}})).status,"OPD_TRANSFERRED");
@@ -37,6 +41,7 @@ async function main(){
  }finally{
   await prisma.activityLog.deleteMany({where:{entityType:"EmergencyCase",entityId:{in:[opd.id,ipd.id]}}});
   await prisma.emergencyCase.deleteMany({where:{id:{in:[opd.id,ipd.id]}}});
+  await prisma.encounter.deleteMany({where:{OR:[{appointmentId:appointment.id},{admissionId:admission.id}]}});
   await prisma.admission.delete({where:{id:admission.id}});
   await prisma.bed.delete({where:{id:bed.id}});
   await prisma.appointment.deleteMany({where:{id:{in:[appointment.id,otherAppointment.id]}}});

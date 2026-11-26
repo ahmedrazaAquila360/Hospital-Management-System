@@ -1,4 +1,5 @@
 import "dotenv/config";
+import {basePrisma} from "../src/lib/prisma-base";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { prisma } from "../src/lib/prisma";
@@ -73,6 +74,7 @@ async function main() {
     await prisma.invoice.deleteMany({ where: { id: { in: invoiceIds } } });
     if (bedId) await prisma.bed.delete({ where: { id: bedId } });
     if (medicationId) {
+      await basePrisma.stockMovement.deleteMany({where:{batch:{medicationId}}});
       await prisma.pharmacyBatch.deleteMany({ where: { medicationId } });
       await prisma.medication.delete({ where: { id: medicationId } });
     }

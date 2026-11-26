@@ -23,7 +23,7 @@ export async function listInvoices(filters: InvoiceFilters) {
             ],
           }
         : {},
-      filters.status ? { status: filters.status } : {},
+      filters.status ? { status: filters.status,voidedAt:null } : {},
       filters.patientId ? { patientId: filters.patientId } : {},
     ],
   };
@@ -49,7 +49,7 @@ export async function getInvoiceById(id: string) {
       patient: { select: billingPatient },
       dentist: true,
       createdBy: true,
-      items: { include: { treatment: { select: { id: true, name: true } } } },
+      items: { include: { treatment: { select: { id: true, name: true } },serviceCharge:{select:{id:true}} } },
       payments: { orderBy: { date: "desc" }, include: { receivedBy: true } },
     },
   });
@@ -95,8 +95,8 @@ export function invoicePaidAmount(invoice: { payments: { amount: unknown }[] }) 
 /** Read-only totals for the Invoices summary cards (all invoices, not just the current page). */
 export async function getInvoiceStats() {
   const [count, billed, paid] = await Promise.all([
-    prisma.invoice.count(),
-    prisma.invoice.aggregate({ _sum: { total: true } }),
+    prisma.invoice.count({where:{voidedAt:null}}),
+    prisma.invoice.aggregate({ where:{voidedAt:null},_sum: { total: true } }),
     prisma.payment.aggregate({ _sum: { amount: true } }),
   ]);
   const totalBilled = toNumber(billed._sum.total);

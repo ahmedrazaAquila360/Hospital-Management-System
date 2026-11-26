@@ -39,7 +39,7 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Sea
     date: inv.date,
     total: toNumber(inv.total),
     paid: invoicePaidAmount(inv),
-    status: inv.status,
+    status: inv.voidedAt?"VOIDED":inv.status,
   }));
 
 

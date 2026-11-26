@@ -11,7 +11,7 @@ export default async function PatientBillingStatement({params}:{params:Promise<{
  const {id}=await params;
  const [patient,invoices,hospital]=await Promise.all([
   prisma.patient.findUnique({where:{id},select:{id:true,fullName:true,patientCode:true}}),
-  prisma.invoice.findMany({where:{patientId:id},include:{items:true,payments:true},orderBy:{date:"asc"}}),
+  prisma.invoice.findMany({where:{patientId:id,voidedAt:null},include:{items:true,payments:true},orderBy:{date:"asc"}}),
   prisma.clinicSettings.findFirst({select:{clinicName:true,address:true,phone:true,registrationNumber:true,currency:true}}),
  ]);
  if(!patient)notFound();

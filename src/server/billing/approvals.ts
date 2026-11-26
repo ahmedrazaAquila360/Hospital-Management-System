@@ -17,6 +17,7 @@ export async function requestFinancialApproval(form:FormData){
  if(data.kind==="REFUND"&&!data.method)throw new Error("Select the refund method.");
  await prisma.$transaction(async tx=>{
   const invoice=await tx.invoice.findUniqueOrThrow({where:{id:data.invoiceId},include:{payments:true}});
+  if(invoice.voidedAt)throw new Error("Voided invoices cannot receive financial requests.");
   const value=new Prisma.Decimal(data.amount);
   const paid=invoice.payments.reduce((sum,p)=>sum.plus(p.amount),new Prisma.Decimal(0));
   if(data.kind==="DISCOUNT"&&(value.gt(invoice.subtotal.minus(invoice.discount))||invoice.total.minus(value).lt(paid)))throw new Error("Discount exceeds the unallocated invoice balance.");

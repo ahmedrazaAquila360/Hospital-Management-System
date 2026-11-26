@@ -26,7 +26,7 @@ export function OverviewTab({ patient, showBilling = false }: { patient: Patient
     .filter((a) => a.date < now)
     .sort((a, b) => b.date.getTime() - a.date.getTime())[0];
 
-  const outstanding = patient.invoices.reduce((sum, inv) => {
+  const outstanding = patient.invoices.filter(inv=>!inv.voidedAt).reduce((sum, inv) => {
     const paid = inv.payments.reduce((s, p) => s + toNumber(p.amount), 0);
     return sum + Math.max(0, toNumber(inv.total) - paid);
   }, 0);
@@ -131,7 +131,7 @@ export function OverviewTab({ patient, showBilling = false }: { patient: Patient
             {formatCurrency(outstanding)}
           </p>
           <p className="text-muted-foreground text-sm">
-            across {patient.invoices.filter((i) => i.status !== "PAID").length} open invoice(s)
+            across {patient.invoices.filter((i) => !i.voidedAt && i.status !== "PAID").length} open invoice(s)
           </p>
         </CardContent>
       </Card>}

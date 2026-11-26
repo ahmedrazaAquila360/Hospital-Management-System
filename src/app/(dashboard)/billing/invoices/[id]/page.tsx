@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { RefundForm } from "@/components/billing/refund-form";
 import { RecordPaymentDialog } from "@/components/billing/record-payment-dialog";
 import { InvoiceStatusPill } from "@/components/billing/invoice-status";
+import {voidInvoiceAction} from "@/server/billing/actions";
 import { formatCurrency, formatDate, formatDateTime, toNumber } from "@/lib/format";
 import { can } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
@@ -37,9 +38,9 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
 
   const total = toNumber(invoice.total);
   const paid = invoicePaidAmount(invoice);
-  const remaining = Math.max(0, Math.round((total - paid) * 100) / 100);
+  const remaining = invoice.voidedAt ? 0 : Math.max(0, Math.round((total - paid) * 100) / 100);
   const paidPct = total > 0 ? Math.min(100, (paid / total) * 100) : 100;
-  const canManage = can(user, "billing.payments");
+  const canManage = can(user, "billing.payments")&&!invoice.voidedAt;
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-5">
@@ -73,7 +74,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-3">
               <h2 className="font-heading text-navy text-2xl font-semibold tracking-tight sm:text-[1.7rem]">{invoice.invoiceNumber}</h2>
-              <InvoiceStatusPill status={invoice.status} />
+              <InvoiceStatusPill status={invoice.voidedAt?"VOIDED":invoice.status} />
             </div>
             <p className="text-muted-foreground mt-0.5">
               Invoice for{" "}
@@ -109,7 +110,9 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
         </div>
       </section>
 
-      {can(user,"billing.refund") && paid > 0 && <details className="surface-card p-5"><summary>Record refund</summary>
+      {invoice.voidedAt&&<p className="surface-card p-5 font-semibold">VOIDED · {invoice.voidReason} · {formatDateTime(invoice.voidedAt)}. Retained for audit; excluded from balances.</p>}
+      {!invoice.voidedAt&&can(user,"billing.void")&&["ADMIN","SUPER_ADMIN"].includes(user.role.name)&&invoice.invoiceNumber.startsWith("HINV-")&&paid===0&&!invoice.items.some(item=>item.serviceCharge)&&<details className="surface-card p-5"><summary>Void unpaid manual invoice</summary><form action={voidInvoiceAction} className="mt-3 flex flex-wrap gap-2"><input type="hidden" name="invoiceId" value={invoice.id}/><input name="reason" required minLength={3} maxLength={500} placeholder="Reason for void" aria-label="Void reason" className="rounded border p-2"/><Button variant="outline">Void invoice</Button></form></details>}
+      {!invoice.voidedAt&&can(user,"billing.refund") && paid > 0 && <details className="surface-card p-5"><summary>Record refund</summary>
         <RefundForm invoiceId={id} paid={paid}/></details>}
       {/* Key facts */}
       <section className="surface-card grid grid-cols-1 gap-y-4 p-5 sm:grid-cols-2 sm:p-6 xl:grid-cols-4 xl:divide-x xl:divide-border/70">

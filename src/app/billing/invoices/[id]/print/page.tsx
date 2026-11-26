@@ -27,7 +27,7 @@ export default async function InvoicePrintPage({ params }: { params: Promise<{ i
 
   const total = toNumber(invoice.total);
   const paid = invoicePaidAmount(invoice);
-  const remaining = Math.max(0, Math.round((total - paid) * 100) / 100);
+  const remaining = invoice.voidedAt ? 0 : Math.max(0, Math.round((total - paid) * 100) / 100);
   const contact = [clinic.phone, clinic.email, clinic.website].filter(Boolean).join("  ·  ");
 
   return (
@@ -58,17 +58,18 @@ export default async function InvoicePrintPage({ params }: { params: Promise<{ i
             </div>
           </div>
           <div className="text-right">
-            <p className="text-4xl font-extrabold tracking-tight text-[#0b2a55]">INVOICE</p>
+            <p className="text-4xl font-extrabold tracking-tight text-[#0b2a55]">{invoice.voidedAt ? "VOIDED INVOICE" : "INVOICE"}</p>
             <span
               className={cn(
                 "mt-2 inline-block rounded-full px-3.5 py-1 text-sm font-semibold ring-1 ring-inset",
-                INVOICE_STATUS_STYLE[invoice.status] ?? INVOICE_STATUS_STYLE.UNPAID
+                INVOICE_STATUS_STYLE[invoice.voidedAt ? "VOIDED" : invoice.status] ?? INVOICE_STATUS_STYLE.UNPAID
               )}
             >
-              {INVOICE_STATUS_LABEL[invoice.status] ?? invoice.status}
+              {invoice.voidedAt ? "Voided" : INVOICE_STATUS_LABEL[invoice.status] ?? invoice.status}
             </span>
           </div>
         </div>
+        {invoice.voidedAt && <p className="mt-4 rounded-lg border border-slate-300 bg-slate-100 p-3 font-semibold">VOIDED · {formatDateTime(invoice.voidedAt)} · {invoice.voidReason}</p>}
 
         {/* Number / dates */}
         <div className="mt-6 grid grid-cols-3 divide-x divide-[#dbe6f1]">

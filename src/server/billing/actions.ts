@@ -9,6 +9,7 @@ import { requireUser } from "@/lib/auth/guard";
 import { invoiceSchema, paymentSchema } from "@/lib/validations/invoice";
 import { createManualInvoice } from "./create-invoice";
 import { can } from "@/lib/permissions";
+import {voidManualInvoice} from "./void-transaction";
 
 export type InvoiceFormState = { error?: string };
 export type PaymentFormState = { error?: string; success?: boolean };
@@ -107,4 +108,12 @@ export async function refundPayment(form: FormData): Promise<PaymentFormState> {
   revalidatePath("/dashboard");
   revalidatePath("/reports");
   return { success: true };
+}
+
+export async function voidInvoiceAction(form:FormData){
+ const actor=await requireUser();
+ const data=z.object({invoiceId:z.string().min(1),reason:z.string().trim().min(3).max(500)}).parse(Object.fromEntries(form));
+ await voidManualInvoice(data.invoiceId,data.reason,actor);
+ revalidatePath("/billing/invoices");revalidatePath(`/billing/invoices/${data.invoiceId}`);
+ revalidatePath("/dashboard");revalidatePath("/reports");
 }

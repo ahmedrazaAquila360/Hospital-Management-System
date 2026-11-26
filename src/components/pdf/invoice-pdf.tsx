@@ -60,7 +60,7 @@ const s = StyleSheet.create({
 export function InvoicePdf({ invoice, clinic, logoSrc }: { invoice: Invoice; clinic: Clinic; logoSrc?: string | null }) {
   const total = Number(invoice.total);
   const paid = invoice.payments.reduce((sum, p) => sum + Number(p.amount), 0);
-  const remaining = Math.max(0, Math.round((total - paid) * 100) / 100);
+  const remaining = invoice.voidedAt ? 0 : Math.max(0, Math.round((total - paid) * 100) / 100);
   const status = STATUS[invoice.status] ?? STATUS.UNPAID;
   const contact = [clinic.phone, clinic.email, clinic.website].filter(Boolean).join("  ·  ");
   const generated = formatDateTime(new Date());
@@ -85,12 +85,13 @@ export function InvoicePdf({ invoice, clinic, logoSrc }: { invoice: Invoice; cli
             </View>
           </View>
           <View>
-            <Text style={s.title}>INVOICE</Text>
-            <Text style={[s.pill, { backgroundColor: status.bg, color: status.fg }]}>{INVOICE_STATUS_LABEL[invoice.status] ?? invoice.status}</Text>
+            <Text style={s.title}>{invoice.voidedAt ? "VOIDED INVOICE" : "INVOICE"}</Text>
+            <Text style={[s.pill, { backgroundColor: status.bg, color: status.fg }]}>{invoice.voidedAt ? "VOIDED" : INVOICE_STATUS_LABEL[invoice.status] ?? invoice.status}</Text>
           </View>
         </View>
 
         <View style={s.rule} />
+        {invoice.voidedAt ? <Text>VOIDED {formatDateTime(invoice.voidedAt)}: {invoice.voidReason}</Text> : null}
 
         <View style={s.row}>
           <View style={s.metaCell}>

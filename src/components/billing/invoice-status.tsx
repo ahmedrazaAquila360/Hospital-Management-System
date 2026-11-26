@@ -5,6 +5,7 @@ export const INVOICE_STATUS_STYLE: Record<string, string> = {
   UNPAID: "bg-rose-50 text-rose-700 ring-rose-200",
   PARTIALLY_PAID: "bg-amber-50 text-amber-800 ring-amber-200",
   PAID: "bg-emerald-50 text-emerald-700 ring-emerald-200",
+  VOIDED: "bg-slate-100 text-slate-700 ring-slate-300",
 };
 
 /** Status pill used on the invoice page (dot + label). */

@@ -1,3 +1,4 @@
+import {stockContext} from "./stock-context";
 import "server-only";
 import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/prisma";
@@ -5,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 /** Internal transaction: the server action authorizes and validates dispensing. */
 export async function dispensePrescription(data: { medicineId: string; batchId: string; quantity: number }, actorId: string) {
   return prisma.$transaction(async (tx) => {
+    await stockContext(tx,actorId,"DISPENSE",data.medicineId);
     await tx.$queryRaw`SELECT id FROM "PrescriptionMedicine" WHERE id = ${data.medicineId} FOR UPDATE`;
     const previous = await tx.dispensing.findUnique({ where: { medicineId: data.medicineId } });
     if (previous) {

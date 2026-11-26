@@ -54,6 +54,7 @@ export const TREATMENT_STATUS_ACCENT: Record<string, { badge: string; edge: stri
 };
 
 export const INVOICE_STATUS_TONE: Record<string, StatusTone> = {
+  VOIDED: "neutral",
   UNPAID: "destructive",
   PARTIALLY_PAID: "warning",
   PAID: "success",

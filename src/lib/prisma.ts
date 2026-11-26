@@ -5,8 +5,9 @@ import type { Prisma, PrismaClient } from "@/generated/prisma/client";
 // Branch isolation is enforced by PostgreSQL, including nested relations and raw SQL.
 // Only authentication and branch membership management may use prisma-base directly.
 const branchContext = new AsyncLocalStorage<string>();
-export function withBranch<T>(branchId: string, work: () => T): T {
-  return branchContext.run(branchId, work);
+export function withBranch<T>(branchId: string, work: () => Promise<T>): Promise<T> {
+  // Await inside the context: Prisma's deferred thenables must start before it exits.
+  return branchContext.run(branchId, async () => await work());
 }
 export async function requestBranch(): Promise<string> {
   const explicit = branchContext.getStore();

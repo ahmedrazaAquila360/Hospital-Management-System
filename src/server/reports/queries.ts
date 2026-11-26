@@ -38,14 +38,14 @@ export async function getFinancialReport(start: Date, end: Date, calendarStart =
     prisma.payment.count({ where: { date: { gte: start, lt: end } } }),
     prisma.expense.aggregate({ where: { date: { gte: calendarStart, lt: calendarEnd } }, _sum: { amount: true } }),
     prisma.invoice.findMany({
-      where: { status: { in: ["UNPAID", "PARTIALLY_PAID"] } },
+      where: { status: { in: ["UNPAID", "PARTIALLY_PAID"] },voidedAt:null },
       select: { total: true, payments: { select: { amount: true } } },
     }),
     prisma.$queryRaw<{ category: string; revenue: number }[]>`
       SELECT CASE split_part(i."invoiceNumber", '-', 1) WHEN 'OPD' THEN 'Consultations' WHEN 'LAB' THEN 'Laboratory'
         WHEN 'PH' THEN 'Pharmacy' WHEN 'IPD' THEN 'Admissions' ELSE 'Other services' END AS category,
         sum(p.amount)::float8 AS revenue FROM "Payment" p JOIN "Invoice" i ON i.id=p."invoiceId"
-        WHERE p.date >= ${start} AND p.date < ${end} GROUP BY 1 ORDER BY 1`,
+        WHERE p.date >= ${start} AND p.date < ${end} AND i."voidedAt" IS NULL GROUP BY 1 ORDER BY 1`,
   ]);
 
   const outstanding = outstandingInvoices.reduce((sum, inv) => {

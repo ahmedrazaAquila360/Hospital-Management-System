@@ -14,7 +14,7 @@ export async function scanRevenueGuardian(actorId:string){
   prisma.labOrder.findMany({where:{status:"RELEASED"},include:{encounter:{include:{appointment:true,admission:true}}}}),
   prisma.appointment.findMany({where:{status:"COMPLETED",type:"CONSULTATION"},include:{dentist:{include:{doctorProfile:true}}}}),
   prisma.dispensing.findMany({include:{invoice:{include:{items:true}},batch:{include:{medication:true}},medicine:{include:{prescription:true}}}}),
-  prisma.invoice.findMany({where:{OR:[{discount:{gt:0}},{payments:{some:{amount:{lt:0}}}}]},include:{payments:true,approvalRequests:{where:{status:"APPLIED"}}}}),
+  prisma.invoice.findMany({where:{voidedAt:null,OR:[{discount:{gt:0}},{payments:{some:{amount:{lt:0}}}}]},include:{payments:true,approvalRequests:{where:{status:"APPLIED"}}}}),
   prisma.admission.findMany({where:{status:"DISCHARGED"},select:{id:true,number:true,patientId:true}}),
   prisma.serviceCharge.findMany({where:{status:{in:["PENDING","POSTED"]}},include:{service:{select:{name:true}}}}),
  ]);
@@ -23,10 +23,10 @@ export async function scanRevenueGuardian(actorId:string){
   if(service.invoiceItemId)continue;
   candidates.push({rule:"SERVICE_CHARGE_UNBILLED",sourceId:service.id,patientId:service.patientId,evidence:{service:service.service.name,quantity:service.quantity,unitPrice:money(service.unitPrice),chargeStatus:service.status,calculation:"Quantity multiplied by recorded service unit price"},impact:service.amount,severity:"HIGH"});
  }
- const duplicateItems=await prisma.invoiceItem.groupBy({by:["treatmentId"],where:{treatmentId:{not:null}},_count:{_all:true},having:{treatmentId:{_count:{gt:1}}}});
+ const duplicateItems=await prisma.invoiceItem.groupBy({by:["treatmentId"],where:{treatmentId:{not:null},invoice:{voidedAt:null}},_count:{_all:true},having:{treatmentId:{_count:{gt:1}}}});
  for(const group of duplicateItems){
   if(!group.treatmentId)continue;
-  const lines=await prisma.invoiceItem.findMany({where:{treatmentId:group.treatmentId},include:{invoice:{select:{patientId:true}}}});
+  const lines=await prisma.invoiceItem.findMany({where:{treatmentId:group.treatmentId,invoice:{voidedAt:null}},include:{invoice:{select:{patientId:true}}}});
   const overage=lines.slice(1).reduce((sum,line)=>sum.plus(line.amount),new Prisma.Decimal(0));
   candidates.push({rule:"DUPLICATE_TREATMENT_CHARGE",sourceId:group.treatmentId,patientId:lines[0]?.invoice.patientId??null,evidence:{invoiceItemIds:lines.map(l=>l.id),count:lines.length,calculation:"Sum of duplicate lines after the first"},impact:overage.gt(0)?overage:null,severity:"HIGH"});
  }

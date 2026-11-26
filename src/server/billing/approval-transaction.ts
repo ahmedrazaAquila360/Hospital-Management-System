@@ -10,6 +10,8 @@ export async function applyFinancialDecision(data:{id:string;decision:"APPROVE"|
  return prisma.$transaction(async tx=>{
   await tx.$queryRaw`SELECT id FROM "FinancialApproval" WHERE id=${data.id} FOR UPDATE`;
   const request=await tx.financialApproval.findFirstOrThrow({where:{id:data.id,status:"REQUESTED"}});
+  const source=await tx.invoice.findUniqueOrThrow({where:{id:request.invoiceId},select:{voidedAt:true}});
+  if(source.voidedAt)throw new Error("This invoice has been voided.");
   if(request.requestedById===actor.id)throw new Error("A different administrator must decide this request.");
   if(!can(actor,request.kind==="REFUND"?"billing.refund":"billing.discount"))throw new Error("Approval permission is required.");
   if(data.decision==="REJECT"){

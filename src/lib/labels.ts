@@ -29,6 +29,7 @@ export const TREATMENT_STATUS_LABEL: Record<string, string> = {
 };
 
 export const INVOICE_STATUS_LABEL: Record<string, string> = {
+  VOIDED: "Voided",
   UNPAID: "Unpaid",
   PARTIALLY_PAID: "Partially Paid",
   PAID: "Paid",

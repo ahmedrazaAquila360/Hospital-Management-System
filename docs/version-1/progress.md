@@ -35,3 +35,35 @@ Current financial guard: until hospital thresholds and approval workflow are sig
 The reminder CLI ran in the development environment and reported `branch-main: 0 internal reminder(s)` after the synthetic tests cleaned up. Scheduling it in deployment remains an operator task.
 
 All six migrations in this workstream are additive and applied only to the dedicated `hospital_management_mvp` development database. The branch remains **NO-GO** for live patient care or financial use.
+
+## Implementation update — 2026-11-26
+
+This update supersedes the earlier open-item list where stated. Work remains on `version-1`; the UI and existing dental workflows are retained.
+
+- [x] Added login throttling with keyed, normalized identifiers and concurrent failure counting; removed hardcoded development seed password and blocked production synthetic seeds.
+- [x] Added conservative posted-invoice void: only authorized administrators, unpaid manual HINV invoices, no linked consolidated service charges, required reason, retained items and audit. Paid/automatic clinical/pharmacy invoices are rejected. Voids are excluded from balances and marked on HTML/PDF documents. Database guards block payments and changes after void.
+- [x] Added signed branch waiting-board links and configuration screen. Invalid links fail closed. Two-branch token isolation and privacy tests pass. Fixed deferred-query branch-context execution discovered by this test.
+- [x] Added separate append-only vital observations, observation/recording time, author, correction chains and independent review entries. Nurses can record but cannot review by default. Legacy clinical-note vitals are retained.
+- [x] Added basic scheduled shifts, own check-in/out, overlap and duplicate-open checks, and administrator corrections with before/after audit.
+- [x] Added supplier master, purchase-return workflow and immutable stock ledger. A database trigger captures receipts, dispensing, sale returns, purchase returns and adjustments. Existing stock is recorded as an explicitly labelled opening balance; historical movements are not fabricated.
+- [x] Added role-filtered in-app guidance for reception, clinicians, nursing, lab, pharmacy, admissions and cashiers.
+- [x] Added protected reminder and health endpoints for scheduler/monitoring integration. Existing CLI remains supported. Production query argument logging is disabled.
+- [x] Added Revenue Guardian status/severity filters, visible severity/time and row-locked review service with explicit permission checks. Review/assignment/history and denied-role acceptance tests pass.
+- [x] Added follow-up service permission tests and serialized status updates; opt-out/consent and closed-task protections pass.
+- [x] Added laboratory workflow regression covering sample collection, draft result, independent verification, release, one linked invoice and payment.
+- [x] Added encrypted backup/restore tooling. Synthetic rehearsal restored into an isolated temporary database with all **55** public table counts matching and branch-runtime access checks; temporary restore target removed. Real staging recovery and document restore remain required.
+- [x] Created a dedicated development-only synthetic administrator account. Credentials are delivered in the task response, not committed in source.
+
+### Still pending external verification or operator decisions
+
+- Hospital approval of Guardian thresholds, discretionary financial policies, cashier closing policy and triage activation; named clinical/operations/regulatory reviewers and pilot requirements.
+- Hosted reminder and backup scheduling, production monitoring/alerting, approved retention and measured recovery targets.
+- Real PostgreSQL/staging credentials, R2 private bucket/CORS validation and any legacy public-document migration.
+- Actual waiting-board device validation, visual/responsive/accessibility checks, physical printer verification and hospital stakeholder workflow acceptance.
+- Complete user-driven reception → doctor → lab/pharmacy → settlement pilot and dental visual regression. Service/database regression evidence does not replace these gates.
+- Existing OPD/IPD/lab/pharmacy invoices retain their individual identities. Patient statement aggregates them; it is not a replacement single cross-module invoice. Consolidated service-charge posting remains available.
+- No separate general merchandise inventory or purchase-order approval subsystem was added; no operator-specific requirement for these was established. Existing medication receipts, supplier records, purchase returns and stock ledger are implemented.
+
+**Release decision remains NO-GO for live patient care.** Internal synthetic testing may continue. See [deployment environment](deployment-environment.md) for the exact credentials/configuration required.
+
+Final internal validation: **32/32 test files passed**, followed by the strengthened emergency handoff regression and TypeScript check. Production webpack build passed. Administrator/cashier/nurse/lab/pharmacist HTTP page-access checks passed. Browser screenshot/keyboard checks could not run because the browser access host was unavailable. Test account remains development-only. Source changes are not production deployment approval.
