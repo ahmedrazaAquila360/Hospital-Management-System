@@ -10,67 +10,15 @@ import { requestBranch } from "@/lib/prisma";
 import { prisma } from "@/lib/prisma";
 
 const field = z.string().trim().min(1).max(150);
-const price = z.string().regex(/^\d{1,8}(\.\d{1,2})?$/);
 const quantity = z.coerce.number().int().positive().max(1000000);
 
 export async function receive(form: FormData) {
   const actor = await requirePermission("pharmacy.manage");
   assertPermission(actor, "pharmacy.view");
-  const data = z
-    .object({
-      generic: field,
-      brand: field,
-      strength: field,
-      form: field,
-      category: field,
-      lot: field,
-      supplier: field,
-      expiry: z.iso.date(),
-      price,
-      purchase: price,
-      quantity,
-    })
-    .parse(Object.fromEntries(form));
-  const { generic, brand, strength, form: dosageForm, category, expiry, ...batch } = data;
-  await prisma.$transaction(async (tx) => {
-    await stockContext(tx,actor.id,"RECEIVE",data.lot,data.supplier);
-    await tx.supplier.upsert({where:{branchId_name:{branchId:await requestBranch(),name:data.supplier}},create:{name:data.supplier},update:{}});
-    const identity = { generic, brand, strength, form: dosageForm };
-    const medication = await tx.medication.upsert({
-      where: { generic_brand_strength_form: identity },
-      create: { ...identity, category },
-      update: {},
-    });
-    const existing = await tx.pharmacyBatch.findUnique({
-      where: { branchId_medicationId_lot: { branchId: await requestBranch(), medicationId: medication.id, lot: batch.lot } },
-    });
-    if (
-      existing &&
-      (existing.expiry.toISOString().slice(0, 10) !== expiry ||
-        !existing.price.equals(batch.price) ||
-        !existing.purchase.equals(batch.purchase) ||
-        existing.supplier !== batch.supplier)
-    )
-      throw new Error("Batch details differ from the existing lot.");
-    const receipt = existing
-      ? await tx.pharmacyBatch.update({
-          where: { id: existing.id },
-          data: { quantity: { increment: batch.quantity } },
-        })
-      : await tx.pharmacyBatch.create({
-          data: { ...batch, medicationId: medication.id, expiry: new Date(expiry) },
-        });
-    await tx.activityLog.create({
-      data: {
-        userId: actor.id,
-        action: "RECEIVE",
-        entityType: "PharmacyBatch",
-        entityId: receipt.id,
-        metadata: { quantity: batch.quantity },
-      },
-    });
-  });
+  const {receiveStock}=await import("@/server/pharmacy/receive-transaction");
+  await receiveStock(Object.fromEntries(form),actor);
   revalidatePath("/pharmacy");
+  revalidatePath("/pharmacy/ledger");
 }
 
 export async function dispense(form: FormData) {

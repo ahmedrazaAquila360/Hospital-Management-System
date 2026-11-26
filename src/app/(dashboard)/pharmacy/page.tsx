@@ -1,3 +1,4 @@
+import {randomUUID} from "node:crypto";
 import { Pill } from "lucide-react";
 import { requirePermission } from "@/lib/auth/guard";
 import { can } from "@/lib/permissions";
@@ -46,6 +47,7 @@ export default async function Pharmacy() {
           </CardHeader>
           <CardContent>
             <form action={receive} className="grid gap-3 sm:grid-cols-3">
+              <input type="hidden" name="requestId" value={randomUUID()}/>
               {[
                 "generic",
                 "brand",

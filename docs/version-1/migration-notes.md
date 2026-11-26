@@ -16,3 +16,7 @@ Review these SQL files before deployment, take a backup and apply with `pnpm exe
 No destructive down migration is supplied: dropping new tables after staff enter records would erase history. Use a tested backup/recovery plan rather than resetting the database. The encrypted local rehearsal successfully restored all 55 table counts and tested runtime grants; staging recovery with the real PostgreSQL provider, private documents, encryption-key custody and actual recovery timing is still required. Restore tooling refuses an existing nonempty target.
 
 The new stock ledger begins at its activation balance. It does not reconstruct earlier transactions or replace earlier activity logs. Purchase returns change physical stock and record purchase value; they do not automatically create supplier payments or refunds.
+
+## Additional receipt migration
+
+`20261126000500_pharmacy_receipts` adds immutable, branch-scoped purchase receipts with a unique submission ID, request fingerprint, batch reference, quantity, supplier snapshot, purchase value and actor. Receiving writes the receipt, stock movement and audit atomically. No existing batch or patient records are removed; no historical receipts are fabricated. Earlier receiving activity remains in the stock ledger. Restart application processes after Prisma generation so they load the new model. The development database now has 42 migrations.
