@@ -1,6 +1,7 @@
 import "server-only";
 import {z} from "zod";
 import {LabStatus} from "@/generated/prisma/enums";
+import {encounterScope} from "@/server/encounters/scope";
 import {can,type SessionUser} from "@/lib/permissions";
 import {prisma} from "@/lib/prisma";
 import {invoiceService} from "@/server/billing/service-charge";
@@ -54,5 +55,25 @@ export async function advanceLabOrder(form: FormData, user: SessionUser) {
     await tx.activityLog.create({
       data: { action: status, entityType: "LabOrder", entityId: id, userId: user.id },
     });
+  });
+}
+
+
+export async function orderLabTest(form:FormData,doctor:SessionUser){
+ if(!can(doctor,"lab.create")||!can(doctor,"opd.view"))throw new Error("Laboratory order permission required.");
+  const encounterId = z.string().min(1).parse(form.get("encounterId"));
+  const testId = z.string().min(1).parse(form.get("testId"));
+  return prisma.$transaction(async (tx) => {
+    await tx.encounter.findFirstOrThrow({
+      where: { id: encounterId, ...encounterScope(doctor, undefined, true) },
+    });
+    const test = await tx.labTest.findUniqueOrThrow({ where: { id: testId } });
+    const order = await tx.labOrder.create({
+      data: { encounterId, testId, price: test.price, referenceRange: test.referenceRange },
+    });
+    await tx.activityLog.create({
+      data: { action: "ORDER", entityType: "LabOrder", entityId: order.id, userId: doctor.id },
+    });
+    return order;
   });
 }
