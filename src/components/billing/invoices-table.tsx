@@ -21,7 +21,8 @@ export type InvoiceRow = {
 };
 
 /** Table on wide cards, stacked cards on narrow ones (container queries on the parent). */
-export function InvoicesTable({ rows, filtered }: { rows: InvoiceRow[]; filtered: boolean }) {
+export function InvoicesTable({ rows, filtered,currency }: { rows: InvoiceRow[]; filtered: boolean;currency:string }) {
+  const money=(value:unknown)=>formatCurrency(value,currency);
   if (rows.length === 0) {
     return (
       <Empty className="w-auto border-border/70 mx-4 mb-5 rounded-2xl border border-dashed py-12 sm:mx-5">
@@ -64,10 +65,10 @@ export function InvoicesTable({ rows, filtered }: { rows: InvoiceRow[]; filtered
                     <Patient inv={inv} />
                   </td>
                   <td className="text-foreground/80 px-3 py-3 whitespace-nowrap">{formatDate(inv.date)}</td>
-                  <td className="text-navy px-3 py-3 text-right font-semibold tabular-nums">{formatCurrency(inv.total)}</td>
-                  <td className="text-success px-3 py-3 text-right tabular-nums">{formatCurrency(inv.paid)}</td>
+                  <td className="text-navy px-3 py-3 text-right font-semibold tabular-nums">{money(inv.total)}</td>
+                  <td className="text-success px-3 py-3 text-right tabular-nums">{money(inv.paid)}</td>
                   <td className={cn("px-3 py-3 text-right tabular-nums", remaining > 0 ? "text-destructive font-semibold" : "text-muted-foreground")}>
-                    {formatCurrency(remaining)}
+                    {money(remaining)}
                   </td>
                   <td className="px-3 py-3">
                     <StatusBadge status={inv.status} tone={INVOICE_STATUS_TONE[inv.status]} />
@@ -101,16 +102,16 @@ export function InvoicesTable({ rows, filtered }: { rows: InvoiceRow[]; filtered
               <dl className="bg-muted/40 grid grid-cols-3 gap-2 rounded-xl p-3 text-xs">
                 <div>
                   <dt className="text-muted-foreground">Total</dt>
-                  <dd className="text-navy mt-0.5 font-semibold tabular-nums">{formatCurrency(inv.total)}</dd>
+                  <dd className="text-navy mt-0.5 font-semibold tabular-nums">{money(inv.total)}</dd>
                 </div>
                 <div>
                   <dt className="text-muted-foreground">Paid</dt>
-                  <dd className="text-success mt-0.5 tabular-nums">{formatCurrency(inv.paid)}</dd>
+                  <dd className="text-success mt-0.5 tabular-nums">{money(inv.paid)}</dd>
                 </div>
                 <div>
                   <dt className="text-muted-foreground">Remaining</dt>
                   <dd className={cn("mt-0.5 tabular-nums", remaining > 0 ? "text-destructive font-semibold" : "text-muted-foreground")}>
-                    {formatCurrency(remaining)}
+                    {money(remaining)}
                   </dd>
                 </div>
               </dl>

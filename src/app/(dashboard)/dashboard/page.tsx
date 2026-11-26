@@ -126,7 +126,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       <StatGrid stats={statEntries.filter(s => can(user,"billing.view") || !["Today's Revenue","Outstanding Payments"].includes(s.label))} />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:gap-5">
-        {can(user,"billing.view") && <RevenueChart data={revenue} />}
+        {can(user,"billing.view") && <RevenueChart currency={settings.currency} data={revenue} />}
         <ClinicTodayCard
           dateLabel={formatDate(new Date(), "EEEE, MMM d")}
           total={stats.todayAppointments}
@@ -157,9 +157,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:gap-5 xl:grid-cols-3">
         <AppointmentListPanel title="Upcoming Appointments" appointments={upcomingAppointments} showDate />
-        {can(user,"billing.view") && <RecentPaymentsPanel payments={recentPayments} />}
+        {can(user,"billing.view") && <RecentPaymentsPanel currency={settings.currency} payments={recentPayments} />}
         <div className="md:col-span-2 xl:col-span-1">
-          {can(user,"billing.view") && <OutstandingBalancesPanel invoices={outstandingBalances} />}
+          {can(user,"billing.view") && <OutstandingBalancesPanel currency={settings.currency} invoices={outstandingBalances} />}
         </div>
       </div>
       <div className="grid gap-4 lg:grid-cols-2"><section className="surface-card space-y-4 p-5"><h3 className="font-semibold">Patients by department</h3>

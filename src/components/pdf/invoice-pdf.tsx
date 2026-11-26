@@ -28,7 +28,7 @@ const s = StyleSheet.create({
   title: { fontSize: 26, fontFamily: "Helvetica-Bold", color: NAVY, textAlign: "right" },
   pill: { marginTop: 6, alignSelf: "flex-end", borderRadius: 10, paddingVertical: 3, paddingHorizontal: 10, fontSize: 9.5, fontFamily: "Helvetica-Bold" },
   rule: { borderBottomWidth: 1, borderBottomColor: "#cfdcea", marginTop: 16, marginBottom: 16 },
-  metaCell: { flex: 1, paddingRight: 12 },
+  metaCell: { width: "33.33%", paddingRight: 12, minWidth: 0 },
   metaDivider: { borderLeftWidth: 1, borderLeftColor: LINE, paddingLeft: 12 },
   label: { fontSize: 9, color: "#64748b", marginBottom: 3 },
   metaValue: { fontSize: 12, color: NAVY },
@@ -58,6 +58,7 @@ const s = StyleSheet.create({
  * the renderer can load; without it the DentalHub tooth mark is drawn.
  */
 export function InvoicePdf({ invoice, clinic, logoSrc }: { invoice: Invoice; clinic: Clinic; logoSrc?: string | null }) {
+  const money=(value:unknown)=>formatCurrency(value,clinic.currency);
   const total = Number(invoice.total);
   const paid = invoice.payments.reduce((sum, p) => sum + Number(p.amount), 0);
   const remaining = invoice.voidedAt ? 0 : Math.max(0, Math.round((total - paid) * 100) / 100);
@@ -96,7 +97,7 @@ export function InvoicePdf({ invoice, clinic, logoSrc }: { invoice: Invoice; cli
         <View style={s.row}>
           <View style={s.metaCell}>
             <Text style={s.label}>Invoice #</Text>
-            <Text style={s.invNo}>{invoice.invoiceNumber}</Text>
+            <Text style={s.invNo}>{invoice.invoiceNumber.match(/.{1,18}/g)?.join("\n")}</Text>
           </View>
           <View style={[s.metaCell, s.metaDivider]}>
             <Text style={s.label}>Invoice Date</Text>
@@ -104,7 +105,7 @@ export function InvoicePdf({ invoice, clinic, logoSrc }: { invoice: Invoice; cli
           </View>
           <View style={[s.metaCell, s.metaDivider]}>
             <Text style={s.label}>Patient ID</Text>
-            <Text style={s.metaValue}>{invoice.patient.patientCode}</Text>
+            <Text style={s.metaValue}>{invoice.patient.patientCode.match(/.{1,22}/g)?.join("\n")}</Text>
           </View>
         </View>
 
@@ -139,8 +140,8 @@ export function InvoicePdf({ invoice, clinic, logoSrc }: { invoice: Invoice; cli
                   <Text style={[s.cNo, { color: "#64748b" }]}>{i + 1}</Text>
                   <Text style={s.cDesc}>{item.description}</Text>
                   <Text style={s.cQty}>{item.quantity}</Text>
-                  <Text style={s.cPrice}>{formatCurrency(item.unitPrice)}</Text>
-                  <Text style={[s.cAmt, { fontFamily: "Helvetica-Bold" }]}>{formatCurrency(item.amount)}</Text>
+                  <Text style={s.cPrice}>{money(item.unitPrice)}</Text>
+                  <Text style={[s.cAmt, { fontFamily: "Helvetica-Bold" }]}>{money(item.amount)}</Text>
                 </View>
               ))}
             </View>
@@ -150,27 +151,27 @@ export function InvoicePdf({ invoice, clinic, logoSrc }: { invoice: Invoice; cli
             <Text style={s.h2}>Invoice Summary</Text>
             <View style={s.sumRow}>
               <Text>Subtotal</Text>
-              <Text style={{ fontFamily: "Helvetica-Bold" }}>{formatCurrency(invoice.subtotal)}</Text>
+              <Text style={{ fontFamily: "Helvetica-Bold" }}>{money(invoice.subtotal)}</Text>
             </View>
             <View style={s.sumRow}>
               <Text>Discount</Text>
-              <Text style={{ fontFamily: "Helvetica-Bold" }}>-{formatCurrency(invoice.discount)}</Text>
+              <Text style={{ fontFamily: "Helvetica-Bold" }}>-{money(invoice.discount)}</Text>
             </View>
             <View style={[s.sumRow, { borderBottomWidth: 0 }]}>
               <Text>Tax</Text>
-              <Text style={{ fontFamily: "Helvetica-Bold" }}>+{formatCurrency(invoice.tax)}</Text>
+              <Text style={{ fontFamily: "Helvetica-Bold" }}>+{money(invoice.tax)}</Text>
             </View>
             <View style={[s.sumBox, { backgroundColor: "#e3effb" }]}>
               <Text style={{ fontSize: 12, fontFamily: "Helvetica-Bold", color: NAVY }}>Total</Text>
-              <Text style={{ fontSize: 12, fontFamily: "Helvetica-Bold", color: NAVY }}>{formatCurrency(total)}</Text>
+              <Text style={{ fontSize: 12, fontFamily: "Helvetica-Bold", color: NAVY }}>{money(total)}</Text>
             </View>
             <View style={[s.sumBox, { backgroundColor: "#ecfdf5" }]}>
               <Text style={{ fontFamily: "Helvetica-Bold", color: "#047857" }}>Paid</Text>
-              <Text style={{ fontFamily: "Helvetica-Bold", color: "#047857" }}>{formatCurrency(paid)}</Text>
+              <Text style={{ fontFamily: "Helvetica-Bold", color: "#047857" }}>{money(paid)}</Text>
             </View>
             <View style={[s.sumBox, { backgroundColor: remaining > 0 ? "#fff1f2" : "#f1f5f9" }]}>
               <Text style={{ fontFamily: "Helvetica-Bold", color: remaining > 0 ? "#be123c" : "#64748b" }}>Remaining</Text>
-              <Text style={{ fontFamily: "Helvetica-Bold", color: remaining > 0 ? "#be123c" : "#64748b" }}>{formatCurrency(remaining)}</Text>
+              <Text style={{ fontFamily: "Helvetica-Bold", color: remaining > 0 ? "#be123c" : "#64748b" }}>{money(remaining)}</Text>
             </View>
           </View>
         </View>
@@ -181,8 +182,8 @@ export function InvoicePdf({ invoice, clinic, logoSrc }: { invoice: Invoice; cli
         </View>
 
         <View style={s.footer} fixed>
-          <Text>
-            Generated on {generated} · {clinic.clinicName}
+          <Text style={{flex:1,paddingRight:12}}>
+            {invoice.voidedAt ? "VOIDED · " : ""}{invoice.invoiceNumber} · Generated on {generated} · {clinic.clinicName}
           </Text>
           <Text render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`} />
         </View>

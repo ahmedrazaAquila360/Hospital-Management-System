@@ -58,3 +58,15 @@ This mode only accepts the synthetic `hospital_management_mvp` database. It crea
 ## Policies and sign-off still needed
 
 Pilot hospital/domain and hosting access; confirmed Punjab location; named clinical and operations reviewers; approved triage categories/escalation instructions; approved discount/refund and cashier closing policies; backup retention/RPO/RTO; support contacts and incident escalation. Thresholds remain drafts. No clinical, financial policy, regulatory or production approval is claimed.
+
+## Repeatable internal release checks
+
+After applying development migrations and regenerating Prisma, restart the local server, then run:
+
+```
+RUN_HOSPITAL_TRANSACTION_TESTS=1 HOSPITAL_TEST_ORIGIN=http://localhost:3179 pnpm test:hospital
+```
+
+The runner refuses production mode, a database other than the dedicated synthetic `hospital_management_mvp`, and a nonlocal HTTP target. Tests create and clean synthetic records; the PDF test temporarily switches the synthetic hospital currency to PKR and restores it. Do not run concurrent writers during a backup rehearsal or this configuration test.
+
+PDF samples are created under `/tmp/pdfs/hospital-v1`. For additional content/bounds/raster checks, use an isolated Python environment with PyMuPDF and run `python scripts/verify-pdf-samples.py`. The checks validate currency, all medicine rows, page references, repeated void marks and text bounds. Inspect the generated PNGs and test actual hospital printers separately.

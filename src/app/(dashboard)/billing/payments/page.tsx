@@ -1,3 +1,4 @@
+import {getClinicSettings} from "@/server/settings/queries";
 import type { Metadata } from "next";
 import Link from "next/link";
 import {
@@ -45,14 +46,15 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Sea
   const params = await searchParams;
   const search = params.search?.trim() || undefined;
 
-  const [list, stats] = await Promise.all([
+  const [list, stats,clinic] = await Promise.all([
     listPayments({ search, page: parsePage(params.page), pageSize: parsePageSize(params.perPage) }),
-    getPaymentStats(),
+    getPaymentStats(),getClinicSettings(),
   ]);
   // The two largest methods by amount get their own cards (whatever they are in the data).
   const topMethods = stats.byMethod.slice(0, 2);
 
 
+  const money=(value:unknown)=>formatCurrency(value,clinic.currency);
   return (
     <div className="flex flex-col gap-6">
       <div className="relative">
@@ -61,13 +63,13 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Sea
       </div>
 
       <div className="grid grid-cols-2 gap-2 sm:gap-4 xl:grid-cols-4">
-        <StatCard icon={Wallet} value={formatCurrency(stats.total)} label="Total Collected" tone="success" />
+        <StatCard icon={Wallet} value={money(stats.total)} label="Total Collected" tone="success" />
         <StatCard icon={Layers} value={stats.count} label="Total Payments" />
         {topMethods.map((m) => (
           <StatCard
             key={m.method}
             icon={METHOD_STYLE[m.method]?.icon ?? Wallet}
-            value={formatCurrency(m.amount)}
+            value={money(m.amount)}
             label={`${PAYMENT_METHOD_LABEL[m.method] ?? m.method} · ${stats.total ? Math.round((m.amount / stats.total) * 100) : 0}% of total`}
           />
         ))}
@@ -123,7 +125,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Sea
                         </span>
                       </td>
                       <td className="text-foreground/80 px-3 py-3">{p.receivedBy?.name ?? <span className="text-muted-foreground">—</span>}</td>
-                      <td className="text-success px-3 py-3 text-right font-semibold tabular-nums">{formatCurrency(toNumber(p.amount))}</td>
+                      <td className="text-success px-3 py-3 text-right font-semibold tabular-nums">{money(toNumber(p.amount))}</td>
                       <td className="py-3 pr-5 pl-3 text-right">
                         <Link href={`/billing/payments/${p.id}/receipt`} className="mr-2 underline">Receipt</Link>
                         <ViewInvoice id={p.invoiceId} number={p.invoice.invoiceNumber} />
@@ -139,7 +141,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Sea
                 <li key={p.id} className="flex flex-col gap-2.5 px-4 py-4 sm:px-5">
                   <div className="flex items-start justify-between gap-3">
                     <PersonCell name={p.patient.fullName} href={`/patients/${p.patientId}`} />
-                    <span className="text-success font-semibold tabular-nums">{formatCurrency(toNumber(p.amount))}</span>
+                    <span className="text-success font-semibold tabular-nums">{money(toNumber(p.amount))}</span>
                   </div>
                   <div className="flex flex-wrap items-center gap-2 text-xs">
                     <Link href={`/billing/invoices/${p.invoiceId}`} className="text-brand font-mono font-semibold">

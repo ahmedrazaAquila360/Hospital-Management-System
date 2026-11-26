@@ -17,7 +17,8 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-export function OverviewTab({ patient, showBilling = false }: { patient: Patient; showBilling?: boolean }) {
+export function OverviewTab({currency,  patient, showBilling = false }: { currency:string; patient: Patient; showBilling?: boolean }) {
+  const money=(value:unknown)=>formatCurrency(value,currency);
   const now = new Date();
   const nextAppointment = patient.appointments
     .filter((a) => a.date >= now && ["SCHEDULED", "CONFIRMED"].includes(a.status))
@@ -128,7 +129,7 @@ export function OverviewTab({ patient, showBilling = false }: { patient: Patient
         </CardHeader>
         <CardContent>
           <p className={`text-2xl font-semibold ${outstanding > 0 ? "text-destructive" : ""}`}>
-            {formatCurrency(outstanding)}
+            {money(outstanding)}
           </p>
           <p className="text-muted-foreground text-sm">
             across {patient.invoices.filter((i) => !i.voidedAt && i.status !== "PAID").length} open invoice(s)

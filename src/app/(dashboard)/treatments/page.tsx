@@ -1,3 +1,4 @@
+import {getClinicSettings} from "@/server/settings/queries";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { CalendarDays, CircleCheck, Layers, Plus } from "lucide-react";
@@ -26,6 +27,7 @@ const SORTS = ["date_asc", "date_desc"] as const;
 
 export default async function TreatmentsPage({ searchParams }: { searchParams: SearchParams }) {
   const user = await requirePermission("treatments.view");
+  const currency=(await getClinicSettings()).currency;
   const params = await searchParams;
   const search = params.search?.trim() || undefined;
   // Unknown values would reach Prisma as invalid enums and fail the page.
@@ -104,7 +106,7 @@ export default async function TreatmentsPage({ searchParams }: { searchParams: S
 
       <section className="surface-card @container overflow-hidden p-0">
         <TreatmentsToolbar dentists={dentists} />
-        <TreatmentsTable rows={rows} canEdit={canEdit} canDelete={canDelete} filtered={Boolean(search || status || dentistId)} sort={sort} sortHref={sortHref} />
+        <TreatmentsTable currency={currency} rows={rows} canEdit={canEdit} canDelete={canDelete} filtered={Boolean(search || status || dentistId)} sort={sort} sortHref={sortHref} />
         <ListFooter page={list.page} pageSize={list.pageSize} total={list.total} shown={rows.length} noun="treatment" />
       </section>
     </div>

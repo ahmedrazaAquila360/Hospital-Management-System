@@ -8,7 +8,7 @@ const billingPatient = { id: true, patientCode: true, fullName: true, email: tru
 
 export const INVOICES_PAGE_SIZE = DEFAULT_PAGE_SIZE;
 
-export type InvoiceFilters = { search?: string; status?: InvoiceStatus; patientId?: string; page?: number; pageSize?: number };
+export type InvoiceFilters = { search?: string; status?: InvoiceStatus | "VOIDED"; patientId?: string; page?: number; pageSize?: number };
 
 export async function listInvoices(filters: InvoiceFilters) {
   const page = Math.max(1, filters.page ?? 1);
@@ -23,7 +23,7 @@ export async function listInvoices(filters: InvoiceFilters) {
             ],
           }
         : {},
-      filters.status ? { status: filters.status,voidedAt:null } : {},
+      filters.status === "VOIDED" ? {voidedAt:{not:null}} : filters.status ? { status: filters.status,voidedAt:null } : {},
       filters.patientId ? { patientId: filters.patientId } : {},
     ],
   };

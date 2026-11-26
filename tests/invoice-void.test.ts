@@ -4,6 +4,7 @@ import {randomUUID} from 'node:crypto';
 import {prisma} from '../src/lib/prisma';
 import {createManualInvoice} from '../src/server/billing/create-invoice';
 import {voidManualInvoice} from '../src/server/billing/void-transaction';
+import {listInvoices} from '../src/server/billing/queries';
 import {postInvoicePayment} from '../src/server/billing/payment-transaction';
 import {ALL_PERMISSION_KEYS,type SessionUser} from '../src/lib/permissions';
 async function main(){
@@ -19,6 +20,8 @@ async function main(){
  assert.equal(results.filter(r=>r.status==='fulfilled').length,1);
  const kept=await prisma.invoice.findUniqueOrThrow({where:{id:i.id},include:{items:true}});
  assert(kept.voidedAt);assert.equal(kept.items.length,1);assert.equal(kept.total.toFixed(2),'10.00');
+ assert.equal((await listInvoices({status:'VOIDED',patientId:p.id})).total,1);
+ assert.equal((await listInvoices({status:'UNPAID',patientId:p.id})).total,0);
  await assert.rejects(prisma.invoice.update({where:{id:i.id},data:{voidedAt:null}}));
  await assert.rejects(prisma.payment.create({data:{invoiceId:i.id,patientId:p.id,receivedById:actor.id,amount:10,method:'CASH',requestId:randomUUID()}}));
  assert.match((await postInvoicePayment({invoiceId:i.id,amount:10,method:'CASH',requestId:randomUUID()},actor)).error??'',/voided/);

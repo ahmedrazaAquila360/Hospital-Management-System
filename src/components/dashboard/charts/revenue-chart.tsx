@@ -6,7 +6,8 @@ import { AXIS_TICK, ChartHeader, ChartTooltip, GRID_STROKE } from "@/components/
 import { formatCurrency } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
-export function RevenueChart({ data, className }: { data: { month: string; revenue: number }[]; className?: string }) {
+export function RevenueChart({currency,  data, className }: { currency:string; data: { month: string; revenue: number }[]; className?: string }) {
+  const money=(value:unknown)=>formatCurrency(value,currency);
   const total = data.reduce((sum, d) => sum + d.revenue, 0);
 
   return (
@@ -17,7 +18,7 @@ export function RevenueChart({ data, className }: { data: { month: string; reven
         aside={
           <div className="text-right">
             <p className="text-muted-foreground text-[11px] font-medium tracking-wide uppercase">6-month total</p>
-            <p className="font-heading text-navy text-xl font-semibold tracking-tight tabular">{formatCurrency(total)}</p>
+            <p className="font-heading text-navy text-xl font-semibold tracking-tight tabular">{money(total)}</p>
           </div>
         }
       />
@@ -37,11 +38,11 @@ export function RevenueChart({ data, className }: { data: { month: string; reven
               axisLine={false}
               width={56}
               tick={AXIS_TICK}
-              tickFormatter={(v) => `$${v >= 1000 ? `${(v / 1000).toFixed(1)}k` : v}`}
+              tickFormatter={(v) => new Intl.NumberFormat("en-US",{style:"currency",currency,notation:"compact",maximumFractionDigits:1}).format(Number(v))}
             />
             <Tooltip
               cursor={{ stroke: "var(--chart-1)", strokeOpacity: 0.25, strokeWidth: 1 }}
-              content={<ChartTooltip formatValue={(v) => formatCurrency(v)} />}
+              content={<ChartTooltip formatValue={(v) => money(v)} />}
             />
             <Area
               type="monotone"

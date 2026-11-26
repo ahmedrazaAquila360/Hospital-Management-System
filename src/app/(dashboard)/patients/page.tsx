@@ -1,3 +1,4 @@
+import {getClinicSettings} from "@/server/settings/queries";
 import { enrollPatient } from "@/server/branches/actions";
 import { Input } from "@/components/ui/input";
 import type { Metadata } from "next";
@@ -33,6 +34,7 @@ type SearchParams = Promise<{
 
 export default async function PatientsPage({ searchParams }: { searchParams: SearchParams }) {
   const user = await requirePermission("patients.view");
+  const currency=(await getClinicSettings()).currency;
   const params = await searchParams;
   const search = params.search?.trim() || undefined;
   // Unknown values would reach Prisma as invalid enums and fail the page.
@@ -94,7 +96,7 @@ export default async function PatientsPage({ searchParams }: { searchParams: Sea
       <section className="surface-card @container overflow-hidden p-0">
         {canCreate && <form action={enrollPatient} className="mb-4 flex gap-2"><Input name="patientCode" placeholder="Existing hospital MRN" required/><Button variant="outline">Enroll existing patient in this branch</Button></form>}
         <PatientsToolbar dentists={dentists} />
-        <PatientsTable rows={rows} canManage={canManage} canDelete={can(user, "patients.delete")} filtered={filtered} />
+        <PatientsTable currency={currency} rows={rows} canManage={canManage} canDelete={can(user, "patients.delete")} filtered={filtered} />
         <ListFooter page={list.page} pageSize={list.pageSize} total={list.total} shown={rows.length} noun="patient" />
       </section>
     </div>

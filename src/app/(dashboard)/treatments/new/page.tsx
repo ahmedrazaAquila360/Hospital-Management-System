@@ -1,3 +1,4 @@
+import {getClinicSettings} from "@/server/settings/queries";
 import type { Metadata } from "next";
 import { requirePermission } from "@/lib/auth/guard";
 import { patientScope } from "@/server/patients/access";
@@ -15,6 +16,7 @@ type SearchParams = Promise<{ patientId?: string; appointmentId?: string; toothN
 
 export default async function NewTreatmentPage({ searchParams }: { searchParams: SearchParams }) {
   const actor = await requirePermission("treatments.create");
+  const currency=(await getClinicSettings()).currency;
   const params = await searchParams;
 
   const [dentists, defaultPatient] = await Promise.all([
@@ -31,6 +33,7 @@ export default async function NewTreatmentPage({ searchParams }: { searchParams:
         <ToothOutline className="absolute -top-3 right-4 hidden md:block" />
       </div>
       <TreatmentForm
+        currency={currency}
         action={createTreatmentAction}
         dentists={dentists.map((d) => ({ id: d.id, name: d.name }))}
         defaultPatient={defaultPatient}

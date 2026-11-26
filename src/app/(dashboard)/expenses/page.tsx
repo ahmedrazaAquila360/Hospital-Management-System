@@ -1,3 +1,4 @@
+import {getClinicSettings} from "@/server/settings/queries";
 import type { Metadata } from "next";
 import {
   CalendarDays,
@@ -49,6 +50,8 @@ type SearchParams = Promise<{ search?: string; category?: string; page?: string;
 
 export default async function ExpensesPage({ searchParams }: { searchParams: SearchParams }) {
   const user = await requirePermission("expenses.view");
+  const currency=(await getClinicSettings()).currency;
+  const money=(value:unknown)=>formatCurrency(value,currency);
   const params = await searchParams;
   const canCreate = can(user, "expenses.create");
   const canManage = can(user, "expenses.delete");
@@ -72,21 +75,21 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Sea
           icon={<ReceiptText />}
           title="Expenses"
           description="Track clinic expenses, operational costs and purchases."
-          actions={canCreate && <AddExpenseDialog />}
+          actions={canCreate && <AddExpenseDialog currency={currency} />}
         />
         <ToothOutline className="absolute -top-3 right-56 hidden xl:block" />
       </div>
 
       <div className="grid grid-cols-2 gap-2 sm:gap-4 xl:grid-cols-4">
-        <StatCard icon={Wallet} value={formatCurrency(allTime)} label="All-time Expenses" />
-        <StatCard icon={CalendarDays} value={formatCurrency(summary.thisMonthTotal)} label="This Month" />
+        <StatCard icon={Wallet} value={money(allTime)} label="All-time Expenses" />
+        <StatCard icon={CalendarDays} value={money(summary.thisMonthTotal)} label="This Month" />
         <StatCard
           icon={PieChart}
-          value={top ? formatCurrency(top.total) : "—"}
+          value={top ? money(top.total) : "—"}
           label={top ? `Top: ${EXPENSE_CATEGORY_LABEL[top.category]}` : "Top category"}
           tone="warning"
         />
-        <StatCard icon={ReceiptText} value={formatCurrency(sum)} label={filtered ? `Filtered total · ${total}` : `${total} expense${total === 1 ? "" : "s"} recorded`} />
+        <StatCard icon={ReceiptText} value={money(sum)} label={filtered ? `Filtered total · ${total}` : `${total} expense${total === 1 ? "" : "s"} recorded`} />
       </div>
 
       <section className="surface-card @container overflow-hidden p-0">
@@ -130,7 +133,7 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Sea
                         <CategoryBadge category={e.category} />
                       </td>
                       <td className="text-foreground/80 px-3 py-3">{e.addedBy?.name ?? <span className="text-muted-foreground">—</span>}</td>
-                      <td className="text-navy px-3 py-3 text-right font-semibold tabular-nums">{formatCurrency(toNumber(e.amount))}</td>
+                      <td className="text-navy px-3 py-3 text-right font-semibold tabular-nums">{money(toNumber(e.amount))}</td>
                       {canManage && (
                         <td className="py-3 pr-5 pl-3 text-right">
                           <DeleteExpenseButton id={e.id} title={e.title} />
@@ -155,14 +158,14 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Sea
                     {e.description && <p className="text-muted-foreground text-xs">{e.description}</p>}
                   </div>
                   <div className="flex shrink-0 flex-col items-end gap-2">
-                    <span className="text-navy font-semibold tabular-nums">{formatCurrency(toNumber(e.amount))}</span>
+                    <span className="text-navy font-semibold tabular-nums">{money(toNumber(e.amount))}</span>
                     {canManage && <DeleteExpenseButton id={e.id} title={e.title} />}
                   </div>
                 </li>
               ))}
             </ul>
 
-            <ListFooter page={page} pageSize={pageSize} total={total} shown={expenses.length} noun="expense" extra={formatCurrency(sum)} />
+            <ListFooter page={page} pageSize={pageSize} total={total} shown={expenses.length} noun="expense" extra={money(sum)} />
           </>
         )}
       </section>

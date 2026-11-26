@@ -9,7 +9,8 @@ import type { getPatientById } from "@/server/patients/queries";
 
 type Patient = NonNullable<Awaited<ReturnType<typeof getPatientById>>>;
 
-export function BillingTab({ patient }: { patient: Patient }) {
+export function BillingTab({currency,  patient }: { currency:string; patient: Patient }) {
+  const money=(value:unknown)=>formatCurrency(value,currency);
   if (patient.invoices.length === 0) {
     return (
       <Card>
@@ -46,8 +47,8 @@ export function BillingTab({ patient }: { patient: Patient }) {
               </div>
               <div className="flex items-center gap-4">
                 <div className="text-right text-sm">
-                  <p className="font-medium">{formatCurrency(inv.total)}</p>
-                  {remaining > 0 && <p className="text-destructive text-xs">{formatCurrency(remaining)} due</p>}
+                  <p className="font-medium">{money(inv.total)}</p>
+                  {remaining > 0 && <p className="text-destructive text-xs">{money(remaining)} due</p>}
                 </div>
                 <StatusBadge status={inv.voidedAt?"VOIDED":inv.status} tone={INVOICE_STATUS_TONE[inv.voidedAt?"VOIDED":inv.status]} />
               </div>

@@ -7,7 +7,8 @@ import type { getOutstandingBalances } from "@/server/dashboard/queries";
 
 type Invoice = Awaited<ReturnType<typeof getOutstandingBalances>>[number];
 
-export function OutstandingBalancesPanel({ invoices }: { invoices: Invoice[] }) {
+export function OutstandingBalancesPanel({currency,  invoices }: { currency:string; invoices: Invoice[] }) {
+  const money=(value:unknown)=>formatCurrency(value,currency);
   return (
     <PanelCard title="Outstanding Balances" viewAllHref="/billing/invoices">
       {invoices.length === 0 ? (
@@ -35,7 +36,7 @@ export function OutstandingBalancesPanel({ invoices }: { invoices: Invoice[] }) 
                     {inv.invoiceNumber} · {formatDate(inv.date)}
                   </p>
                 </div>
-                <p className="text-destructive font-semibold tabular">{formatCurrency(inv.remaining)}</p>
+                <p className="text-destructive font-semibold tabular">{money(inv.remaining)}</p>
               </Link>
             </li>
           ))}

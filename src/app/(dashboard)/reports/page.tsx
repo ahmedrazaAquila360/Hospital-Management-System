@@ -40,6 +40,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Sear
   const params = await searchParams;
   const range = (["today", "week", "month", "year", "custom"].includes(params.range ?? "") ? params.range : "month") as ReportRange;
   const clinic = await getClinicSettings();
+  const money=(value:unknown)=>formatCurrency(value,clinic.currency);
   const dates = resolveRange(range, params.from, params.to, clinic.timeZone);
   const { start, end } = await calendarBounds(dates.first, dates.last, clinic.timeZone);
 
@@ -72,31 +73,31 @@ export default async function ReportsPage({ searchParams }: { searchParams: Sear
 
         <ReportsToolbar range={range} from={params.from} to={params.to} />
         <section className="surface-card p-5"><h3 className="font-semibold">Collected revenue by service</h3>
-          {financial.serviceRevenue.length ? financial.serviceRevenue.map(row=><p className="flex justify-between border-b py-2" key={row.category}><span>{row.category}</span><span>{formatCurrency(row.revenue,clinic.currency)}</span></p>) : <p>No payments in this period.</p>}</section>
+          {financial.serviceRevenue.length ? financial.serviceRevenue.map(row=><p className="flex justify-between border-b py-2" key={row.category}><span>{row.category}</span><span>{money(row.revenue)}</span></p>) : <p>No payments in this period.</p>}</section>
 
         <div className="grid grid-cols-2 gap-2 sm:gap-4 xl:grid-cols-4">
-          <StatCard icon={HandCoins} value={formatCurrency(financial.revenue)} label="Revenue (payments)" tone="success" />
-          <StatCard icon={Wallet} value={formatCurrency(financial.expenses)} label="Expenses" tone="destructive" />
+          <StatCard icon={HandCoins} value={money(financial.revenue)} label="Revenue (payments)" tone="success" />
+          <StatCard icon={Wallet} value={money(financial.expenses)} label="Expenses" tone="destructive" />
           <StatCard
             icon={financial.netIncome >= 0 ? TrendingUp : TrendingDown}
-            value={formatCurrency(financial.netIncome)}
+            value={money(financial.netIncome)}
             label="Net Income"
             tone={financial.netIncome >= 0 ? "success" : "destructive"}
           />
-          <StatCard icon={Receipt} value={formatCurrency(financial.outstanding)} label="Outstanding" tone={financial.outstanding > 0 ? "warning" : "brand"} />
+          <StatCard icon={Receipt} value={money(financial.outstanding)} label="Outstanding" tone={financial.outstanding > 0 ? "warning" : "brand"} />
         </div>
 
         <div className="grid gap-6 xl:grid-cols-2">
           <Panel icon={CircleDollarSign} title="Financial Report">
             <div className="space-y-4">
-              <Bar label="Revenue" value={financial.revenue} max={maxMoney} display={formatCurrency(financial.revenue)} className="bg-success" />
-              <Bar label="Expenses" value={financial.expenses} max={maxMoney} display={formatCurrency(financial.expenses)} className="bg-destructive" />
+              <Bar label="Revenue" value={financial.revenue} max={maxMoney} display={money(financial.revenue)} className="bg-success" />
+              <Bar label="Expenses" value={financial.expenses} max={maxMoney} display={money(financial.expenses)} className="bg-destructive" />
             </div>
             <MetricRow
               items={[
                 { label: "Payments recorded", value: financial.paymentsCount },
-                { label: "Net income", value: formatCurrency(financial.netIncome), tone: financial.netIncome >= 0 ? "success" : "destructive" },
-                { label: "Outstanding (all invoices)", value: formatCurrency(financial.outstanding), tone: financial.outstanding > 0 ? "destructive" : undefined },
+                { label: "Net income", value: money(financial.netIncome), tone: financial.netIncome >= 0 ? "success" : "destructive" },
+                { label: "Outstanding (all invoices)", value: money(financial.outstanding), tone: financial.outstanding > 0 ? "destructive" : undefined },
               ]}
             />
           </Panel>
@@ -142,7 +143,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Sear
           <Panel icon={Stethoscope} title="Treatment Report">
             <MetricRow
               items={[
-                { label: "Treatment value", value: formatCurrency(treatments.revenue), tone: "success" },
+                { label: "Treatment value", value: money(treatments.revenue), tone: "success" },
                 { label: "Completed", value: treatments.completed },
                 { label: "Planned / in progress", value: treatments.pending },
               ]}
@@ -197,11 +198,11 @@ export default async function ReportsPage({ searchParams }: { searchParams: Sear
         <PrintSection title="Financial Report">
           <PrintTable
             rows={[
-              ["Revenue (payments received)", formatCurrency(financial.revenue)],
+              ["Revenue (payments received)", money(financial.revenue)],
               ["Payments recorded", String(financial.paymentsCount)],
-              ["Expenses", formatCurrency(financial.expenses)],
-              ["Net income", formatCurrency(financial.netIncome)],
-              ["Outstanding balance (all unpaid invoices)", formatCurrency(financial.outstanding)],
+              ["Expenses", money(financial.expenses)],
+              ["Net income", money(financial.netIncome)],
+              ["Outstanding balance (all unpaid invoices)", money(financial.outstanding)],
             ]}
           />
         </PrintSection>
@@ -228,7 +229,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Sear
         <PrintSection title="Treatment Report">
           <PrintTable
             rows={[
-              ["Treatment value", formatCurrency(treatments.revenue)],
+              ["Treatment value", money(treatments.revenue)],
               ["Completed", String(treatments.completed)],
               ["Planned / in progress", String(treatments.pending)],
             ]}

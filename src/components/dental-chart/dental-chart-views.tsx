@@ -54,6 +54,7 @@ function setSearchParam(key: string, value: string | null) {
  * shared by every view and reset whenever `patient` changes.
  */
 export function DentalChartViews({
+  currency,
   patient,
   treatments,
   canManage,
@@ -62,6 +63,7 @@ export function DentalChartViews({
   initialView,
   initialSection,
 }: {
+  currency:string;
   patient: Patient;
   treatments: ChartTreatment[];
   canManage: boolean;
@@ -339,6 +341,7 @@ export function DentalChartViews({
 
           {section === "procedures" && (
             <ProceduresPanel
+              currency={currency}
               treatments={treatments}
               teeth={teeth}
               patientId={patient.id}

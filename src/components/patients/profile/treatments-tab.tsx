@@ -10,7 +10,8 @@ import type { getPatientById } from "@/server/patients/queries";
 
 type Patient = NonNullable<Awaited<ReturnType<typeof getPatientById>>>;
 
-export function TreatmentsTab({ patient }: { patient: Patient }) {
+export function TreatmentsTab({currency,  patient }: { currency:string; patient: Patient }) {
+  const money=(value:unknown)=>formatCurrency(value,currency);
   if (patient.treatments.length === 0) {
     return (
       <Card>
@@ -54,11 +55,11 @@ export function TreatmentsTab({ patient }: { patient: Patient }) {
               <div className="grid grid-cols-3 gap-3 text-sm">
                 <div>
                   <p className="text-muted-foreground text-xs">Cost</p>
-                  <p className="font-medium">{formatCurrency(net)}</p>
+                  <p className="font-medium">{money(net)}</p>
                 </div>
                 <div>
                   <p className="text-muted-foreground text-xs">Discount</p>
-                  <p className="font-medium">{formatCurrency(discount)}</p>
+                  <p className="font-medium">{money(discount)}</p>
                 </div>
                 <div>
                   <p className="text-muted-foreground text-xs">Expected Completion</p>

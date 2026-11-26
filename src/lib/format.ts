@@ -9,7 +9,7 @@ export function toNumber(value: unknown): number {
   return Number(value);
 }
 
-export function formatCurrency(value: unknown, currency = "USD") {
+export function formatCurrency(value: unknown, currency: string) {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency,

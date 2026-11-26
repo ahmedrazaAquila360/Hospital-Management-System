@@ -1,3 +1,4 @@
+import {getClinicSettings} from "@/server/settings/queries";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { requirePermission } from "@/lib/auth/guard";
@@ -13,6 +14,7 @@ export const metadata: Metadata = { title: "Edit Treatment" };
 
 export default async function EditTreatmentPage({ params }: { params: Promise<{ id: string }> }) {
   await requirePermission("treatments.edit");
+  const currency=(await getClinicSettings()).currency;
   const { id } = await params;
   const [treatment, dentists] = await Promise.all([getTreatmentById(id), getDentists()]);
   if (!treatment) notFound();
@@ -27,9 +29,10 @@ export default async function EditTreatmentPage({ params }: { params: Promise<{ 
         <ToothOutline className="absolute -top-3 right-4 hidden md:block" />
       </div>
       <TreatmentForm
+        currency={currency}
         action={boundAction}
         dentists={dentists.map((d) => ({ id: d.id, name: d.name }))}
-        treatment={treatment}
+        treatment={{id:treatment.id,dentistId:treatment.dentistId,status:treatment.status,description:treatment.description,name:treatment.name,appointmentId:treatment.appointmentId,startDate:treatment.startDate,expectedCompletionDate:treatment.expectedCompletionDate,cost:treatment.cost.toString(),discount:treatment.discount.toString()}}
         defaultPatient={treatment.patient}
         defaultTeeth={treatment.teeth.map((t) => t.tooth.toothNumber)}
         submitLabel="Save Changes"

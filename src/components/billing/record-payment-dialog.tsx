@@ -15,7 +15,6 @@ import { PAYMENT_METHODS } from "@/lib/validations/invoice";
 import { PAYMENT_METHOD_LABEL } from "@/lib/labels";
 import { cn } from "@/lib/utils";
 
-const money = (n: number) => n.toLocaleString("en-US", { style: "currency", currency: "USD" });
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
 /**
@@ -24,18 +23,21 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
  * Partially Paid; errors stay in the dialog with the amount kept.
  */
 export function RecordPaymentDialog({
+  currency,
   invoiceId,
   invoiceNumber,
   total,
   remaining,
   triggerClassName,
 }: {
+  currency:string;
   invoiceId: string;
   invoiceNumber: string;
   total: number;
   remaining: number;
   triggerClassName?: string;
 }) {
+  const money=(n:number)=>n.toLocaleString("en-US",{style:"currency",currency});
   const router = useRouter();
   const balance = round2(remaining);
   const [open, setOpen] = useState(false);
@@ -67,7 +69,7 @@ export function RecordPaymentDialog({
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (isPending) return;
-    if (!(Number.isFinite(value) && value > 0)) return setError("Enter an amount greater than $0.00.");
+    if (!(Number.isFinite(value) && value > 0)) return setError(`Enter an amount greater than ${money(0)}.`);
     if (round2(value) > balance) return setError(`The amount can't be more than the remaining balance of ${money(balance)}.`);
     const formData = new FormData(event.currentTarget);
     setError(null);
@@ -138,7 +140,7 @@ export function RecordPaymentDialog({
                 </FieldLabel>
                 <div className="relative">
                   <span className="text-muted-foreground border-border/80 pointer-events-none absolute inset-y-2 left-0 flex w-10 items-center justify-center border-r text-sm font-medium" aria-hidden>
-                    $
+                    {currency}
                   </span>
                   <input
                     id="pay-amount"

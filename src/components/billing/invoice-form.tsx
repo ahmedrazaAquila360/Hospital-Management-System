@@ -28,7 +28,7 @@ const num = (v: string) => {
 };
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
-function ModeToggle({ value, onChange, label }: { value: Mode; onChange: (m: Mode) => void; label: string }) {
+function ModeToggle({ value, onChange, label,currency }: { value: Mode; onChange: (m: Mode) => void; label: string;currency:string }) {
   return (
     <div className="bg-muted/80 flex rounded-lg p-0.5" role="group" aria-label={`${label} type`}>
       {(["amount", "percent"] as const).map((m) => (
@@ -42,7 +42,7 @@ function ModeToggle({ value, onChange, label }: { value: Mode; onChange: (m: Mod
             value === m ? "bg-brand text-white shadow-sm" : "text-muted-foreground hover:text-foreground"
           )}
         >
-          {m === "amount" ? "$" : "%"}
+          {m === "amount" ? currency : "%"}
         </button>
       ))}
     </div>
@@ -50,18 +50,21 @@ function ModeToggle({ value, onChange, label }: { value: Mode; onChange: (m: Mod
 }
 
 export function InvoiceForm({
+  currency,
   action,
   dentists,
   defaultPatient,
   services,
   defaultItem,
 }: {
+  currency:string;
   action: (state: InvoiceFormState, formData: FormData) => Promise<InvoiceFormState>;
   dentists: Pick<SafeUser, "id" | "name">[];
   services: { name: string; price: string }[];
   defaultPatient?: Pick<Patient,"id"|"phone"|"patientCode"|"fullName"> | null;
   defaultItem?: { description: string; unitPrice: number; treatmentId: string };
 }) {
+  const money=(value:unknown)=>formatCurrency(value,currency);
   const [state, formAction] = useActionState(action, {});
   const requestId = useRef<string>("");
   const [rows, setRows] = useState<ItemRow[]>(
@@ -259,7 +262,7 @@ export function InvoiceForm({
                     </div>
                     <p className="text-navy text-sm font-semibold tabular-nums @2xl:text-right">
                       <span className="text-muted-foreground mr-1 text-xs font-normal @2xl:hidden">Amount</span>
-                      {formatCurrency(Math.floor(num(row.quantity)) * num(row.unitPrice))}
+                      {money(Math.floor(num(row.quantity)) * num(row.unitPrice))}
                     </p>
                     <div className="flex justify-end">
                       {rows.length > 1 && (
@@ -307,14 +310,14 @@ export function InvoiceForm({
         <div className="space-y-4 px-5 py-5 text-sm">
           <div className="flex items-center justify-between">
             <span className="text-foreground/80 font-medium">Subtotal</span>
-            <span className="text-navy font-semibold tabular-nums">{formatCurrency(subtotal)}</span>
+            <span className="text-navy font-semibold tabular-nums">{money(subtotal)}</span>
           </div>
           <div className="space-y-1.5">
             <div className="flex items-center gap-3">
               <label htmlFor="inv-discount" className="text-foreground/80 flex-1 font-medium">
                 Discount
               </label>
-              <ModeToggle value={discountMode} onChange={setDiscountMode} label="Discount" />
+              <ModeToggle currency={currency} value={discountMode} onChange={setDiscountMode} label="Discount" />
               <Input
                 id="inv-discount"
                 type="number"
@@ -330,7 +333,7 @@ export function InvoiceForm({
               />
             </div>
             {discountMode === "percent" && discount > 0 && (
-              <p className="text-muted-foreground text-right text-xs tabular-nums">−{formatCurrency(discount)}</p>
+              <p className="text-muted-foreground text-right text-xs tabular-nums">−{money(discount)}</p>
             )}
             {discountTooBig && <p className="text-destructive text-right text-xs">Discount is larger than the subtotal.</p>}
           </div>
@@ -339,7 +342,7 @@ export function InvoiceForm({
               <label htmlFor="inv-tax" className="text-foreground/80 flex-1 font-medium">
                 Tax
               </label>
-              <ModeToggle value={taxMode} onChange={setTaxMode} label="Tax" />
+              <ModeToggle currency={currency} value={taxMode} onChange={setTaxMode} label="Tax" />
               <Input
                 id="inv-tax"
                 type="number"
@@ -353,13 +356,13 @@ export function InvoiceForm({
               />
             </div>
             {taxMode === "percent" && tax > 0 && (
-              <p className="text-muted-foreground text-right text-xs tabular-nums">+{formatCurrency(tax)}</p>
+              <p className="text-muted-foreground text-right text-xs tabular-nums">+{money(tax)}</p>
             )}
           </div>
           <div className="bg-pale text-navy flex items-center justify-between rounded-2xl px-4 py-3.5">
             <span className="text-base font-semibold">Total</span>
             <span className="font-heading text-2xl font-semibold tabular-nums" aria-live="polite">
-              {formatCurrency(total)}
+              {money(total)}
             </span>
           </div>
         </div>

@@ -48,6 +48,7 @@ function Card({ icon: Icon, title, description, action, children }: { icon: Luci
  * first; the server action validates again and its errors show inline.
  */
 export function TreatmentForm({
+  currency,
   action,
   dentists,
   treatment,
@@ -56,10 +57,10 @@ export function TreatmentForm({
   defaultAppointmentId,
   submitLabel = "Create Treatment",
   cancelHref = "/treatments",
-}: {
+}: { currency:string;
   action: (state: TreatmentFormState, formData: FormData) => Promise<TreatmentFormState>;
   dentists: { id: string; name: string }[];
-  treatment?: Treatment;
+  treatment?: Pick<Treatment,"id"|"dentistId"|"status"|"description"|"name"|"appointmentId"|"startDate"|"expectedCompletionDate"> & {cost:string;discount:string};
   defaultPatient?: Patient | null;
   defaultTeeth?: number[];
   defaultAppointmentId?: string;
@@ -87,7 +88,7 @@ export function TreatmentForm({
     if (String(data.get("name") ?? "").trim().length < 2) next.name = "Treatment name is required";
     const cost = Number(data.get("cost"));
     const discount = Number(data.get("discount") || 0);
-    if (data.get("cost") === "" || !Number.isFinite(cost) || cost < 0) next.cost = "Enter a cost of $0.00 or more";
+    if (data.get("cost") === "" || !Number.isFinite(cost) || cost < 0) next.cost = "Enter a cost of 0.00 or more";
     if (!Number.isFinite(discount) || discount < 0) next.discount = "Discount can't be negative";
     else if (Number.isFinite(cost) && discount > cost) next.discount = "Discount can't be more than the cost";
     const start = String(data.get("startDate") ?? "");
@@ -210,7 +211,7 @@ export function TreatmentForm({
             <div className="grid gap-5 sm:grid-cols-2">
               <Field data-invalid={Boolean(err("cost"))}>
                 <FieldLabel htmlFor="tr-cost">
-                  Cost ($) <RequiredMark />
+                  Cost ({currency}) <RequiredMark />
                 </FieldLabel>
                 <IconInput
                   icon={<CircleDollarSign />}
@@ -229,7 +230,7 @@ export function TreatmentForm({
                 <FieldError>{err("cost")}</FieldError>
               </Field>
               <Field data-invalid={Boolean(err("discount"))}>
-                <FieldLabel htmlFor="tr-discount">Discount ($)</FieldLabel>
+                <FieldLabel htmlFor="tr-discount">Discount ({currency})</FieldLabel>
                 <IconInput
                   icon={<Tag />}
                   id="tr-discount"

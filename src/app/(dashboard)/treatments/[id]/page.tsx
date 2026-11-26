@@ -1,3 +1,4 @@
+import {getClinicSettings} from "@/server/settings/queries";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import Link from "next/link";
@@ -39,6 +40,8 @@ export const metadata: Metadata = { title: "Treatment Details" };
 
 export default async function TreatmentDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await requirePermission("treatments.view");
+  const currency=(await getClinicSettings()).currency;
+  const money=(value:unknown)=>formatCurrency(value,currency);
   const { id } = await params;
   const [treatment, activity] = await Promise.all([
     getTreatmentById(id),
@@ -60,7 +63,7 @@ export default async function TreatmentDetailPage({ params }: { params: Promise<
   const net = Math.max(0, cost - discount);
   const teeth = treatment.teeth.map((t) => t.tooth.toothNumber).sort((a, b) => a - b);
   // One invoice per treatment in practice; de-duplicate in case several items point at it.
-  const invoices = [...new Map(treatment.invoiceItems.map((i) => [i.invoiceId, { ...i.invoice, lineAmount: toNumber(i.amount) }])).values()];
+  const invoices = [...new Map(treatment.invoiceItems.map((i) => [i.invoiceId, { ...i.invoice,status:i.invoice.voidedAt?"VOIDED":i.invoice.status, lineAmount: toNumber(i.amount) }])).values()];
 
   // Timeline: activity log entries plus the dates stored on the treatment itself.
   const timeline = [
@@ -135,15 +138,15 @@ export default async function TreatmentDetailPage({ params }: { params: Promise<
         <section className="surface-card p-5 sm:p-6">
           <h3 className="text-navy border-border/70 border-b pb-4 text-lg font-semibold tracking-tight">Cost Breakdown</h3>
           <dl className="mt-2">
-            <CostRow icon={CircleDollarSign} label="Cost" value={formatCurrency(cost)} />
-            <CostRow icon={BadgePercent} label="Discount" value={discount ? `-${formatCurrency(discount)}` : formatCurrency(0)} />
+            <CostRow icon={CircleDollarSign} label="Cost" value={money(cost)} />
+            <CostRow icon={BadgePercent} label="Discount" value={discount ? `-${money(discount)}` : money(0)} />
           </dl>
           <div className="bg-pale mt-3 flex items-center gap-3 rounded-2xl px-4 py-3.5">
             <span className="text-brand flex size-10 items-center justify-center rounded-full bg-white" aria-hidden>
               <Wallet className="size-5" />
             </span>
             <span className="text-navy flex-1 text-lg font-semibold">Net Total</span>
-            <span className="font-heading text-navy text-2xl font-semibold tabular-nums">{formatCurrency(net)}</span>
+            <span className="font-heading text-navy text-2xl font-semibold tabular-nums">{money(net)}</span>
           </div>
         </section>
       </div>
@@ -252,7 +255,7 @@ export default async function TreatmentDetailPage({ params }: { params: Promise<
                       <span className="min-w-0 flex-1">
                         <span className="text-navy block font-semibold">{inv.invoiceNumber}</span>
                         <span className="text-muted-foreground text-xs">
-                          {formatDate(inv.date)} · this treatment {formatCurrency(inv.lineAmount)}
+                          {formatDate(inv.date)} · this treatment {money(inv.lineAmount)}
                         </span>
                       </span>
                       <span
@@ -263,7 +266,7 @@ export default async function TreatmentDetailPage({ params }: { params: Promise<
                       >
                         {INVOICE_STATUS_LABEL[inv.status] ?? inv.status}
                       </span>
-                      <span className="text-navy w-24 text-right font-semibold tabular-nums">{formatCurrency(inv.total)}</span>
+                      <span className="text-navy w-24 text-right font-semibold tabular-nums">{money(inv.total)}</span>
                     </>
                   );
                   return (

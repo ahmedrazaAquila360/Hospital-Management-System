@@ -25,6 +25,7 @@ export default async function InvoicePrintPage({ params }: { params: Promise<{ i
   const [invoice, clinic] = await Promise.all([getInvoiceById(id), getClinicSettings()]);
   if (!invoice) notFound();
 
+  const money=(value:unknown)=>formatCurrency(value,clinic.currency);
   const total = toNumber(invoice.total);
   const paid = invoicePaidAmount(invoice);
   const remaining = invoice.voidedAt ? 0 : Math.max(0, Math.round((total - paid) * 100) / 100);
@@ -91,7 +92,7 @@ export default async function InvoicePrintPage({ params }: { params: Promise<{ i
             </p>
           </div>
           <div className="pl-6">
-            <p className="text-sm text-slate-500">Dentist</p>
+            <p className="text-sm text-slate-500">Doctor</p>
             <p className="text-xl font-bold text-[#0b2a55]">{invoice.dentist?.name ?? "—"}</p>
           </div>
         </div>
@@ -116,8 +117,8 @@ export default async function InvoicePrintPage({ params }: { params: Promise<{ i
                     <td className="px-3 py-3 text-slate-500 tabular-nums">{i + 1}</td>
                     <td className="px-3 py-3">{item.description}</td>
                     <td className="px-3 py-3 text-center tabular-nums">{item.quantity}</td>
-                    <td className="px-3 py-3 text-right tabular-nums">{formatCurrency(item.unitPrice)}</td>
-                    <td className="px-3 py-3 text-right font-semibold tabular-nums">{formatCurrency(item.amount)}</td>
+                    <td className="px-3 py-3 text-right tabular-nums">{money(item.unitPrice)}</td>
+                    <td className="px-3 py-3 text-right font-semibold tabular-nums">{money(item.amount)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -126,16 +127,16 @@ export default async function InvoicePrintPage({ params }: { params: Promise<{ i
 
           <div className="break-inside-avoid rounded-2xl border border-[#dbe6f1] bg-[#f9fbfe] p-4">
             <p className="mb-2 text-lg font-bold text-[#0b2a55]">Invoice Summary</p>
-            <SumRow label="Subtotal" value={formatCurrency(invoice.subtotal)} />
-            <SumRow label="Discount" value={`-${formatCurrency(invoice.discount)}`} />
-            <SumRow label="Tax" value={`+${formatCurrency(invoice.tax)}`} />
+            <SumRow label="Subtotal" value={money(invoice.subtotal)} />
+            <SumRow label="Discount" value={`-${money(invoice.discount)}`} />
+            <SumRow label="Tax" value={`+${money(invoice.tax)}`} />
             <div className="mt-2 flex justify-between rounded-xl bg-[#e3effb] px-3 py-2.5 text-lg font-bold text-[#0b2a55]">
               <span>Total</span>
-              <span className="tabular-nums">{formatCurrency(total)}</span>
+              <span className="tabular-nums">{money(total)}</span>
             </div>
             <div className="mt-2 flex justify-between rounded-xl bg-emerald-50 px-3 py-2 font-semibold text-emerald-700">
               <span>Paid</span>
-              <span className="tabular-nums">{formatCurrency(paid)}</span>
+              <span className="tabular-nums">{money(paid)}</span>
             </div>
             <div
               className={cn(
@@ -144,7 +145,7 @@ export default async function InvoicePrintPage({ params }: { params: Promise<{ i
               )}
             >
               <span>Remaining</span>
-              <span className="tabular-nums">{formatCurrency(remaining)}</span>
+              <span className="tabular-nums">{money(remaining)}</span>
             </div>
           </div>
         </div>

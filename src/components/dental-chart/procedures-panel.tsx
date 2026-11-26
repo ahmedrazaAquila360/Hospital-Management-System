@@ -65,17 +65,18 @@ export function ToothChip({ toothNumber, condition }: { toothNumber: number; con
   );
 }
 
-export function ProceduresPanel({
+export function ProceduresPanel({currency,
   treatments,
   teeth,
   patientId,
   canManageTreatments,
-}: {
+}: { currency:string;
   treatments: ChartTreatment[];
   teeth: Tooth[];
   patientId: string;
   canManageTreatments: boolean;
 }) {
+  const money=(value:unknown)=>formatCurrency(value,currency);
   const [status, setStatus] = useState<(typeof STATUSES)[number] | null>(null);
   const [tooth, setTooth] = useState<string>("all");
   const idPrefix = `proc${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
@@ -229,7 +230,7 @@ export function ProceduresPanel({
                         t.toothNumbers.map((n) => <ToothChip key={n} toothNumber={n} condition={conditionOf.get(n)} />)
                       )}
                     </div>
-                    <span className="text-sm font-semibold tabular-nums">{formatCurrency(net)}</span>
+                    <span className="text-sm font-semibold tabular-nums">{money(net)}</span>
                   </div>
                 </li>
               );

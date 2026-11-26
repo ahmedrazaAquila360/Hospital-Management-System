@@ -41,14 +41,14 @@ export function TreatmentStatusPill({ status }: { status: string }) {
 }
 
 /** Treatment list: table on wide containers, cards on narrow ones. Must sit inside `@container`. */
-export function TreatmentsTable({
+export function TreatmentsTable({currency,
   rows,
   canEdit,
   canDelete,
   filtered,
   sort,
   sortHref,
-}: {
+}: { currency:string;
   rows: TreatmentRow[];
   canEdit: boolean;
   canDelete: boolean;
@@ -57,6 +57,7 @@ export function TreatmentsTable({
   /** Link that applies the next date order (newest → oldest → default). */
   sortHref: string;
 }) {
+  const money=(value:unknown)=>formatCurrency(value,currency);
   if (rows.length === 0) {
     return (
       <Empty className="w-auto border-border/70 mx-4 mb-5 rounded-2xl border border-dashed py-12 sm:mx-5">
@@ -113,7 +114,7 @@ export function TreatmentsTable({
                 <td className="text-foreground/80 max-w-32 truncate px-3 py-3 tabular-nums" title={teethLabel(t)}>
                   {teethLabel(t)}
                 </td>
-                <td className="text-navy px-3 py-3 text-right font-semibold whitespace-nowrap tabular-nums">{formatCurrency(t.netCost)}</td>
+                <td className="text-navy px-3 py-3 text-right font-semibold whitespace-nowrap tabular-nums">{money(t.netCost)}</td>
                 <td className="text-foreground/80 px-3 py-3 whitespace-nowrap">{t.startDate ? formatDate(t.startDate) : <span className="text-muted-foreground">Not set</span>}</td>
                 <td className="px-3 py-3">
                   <TreatmentStatusPill status={t.status} />
@@ -147,7 +148,7 @@ export function TreatmentsTable({
               </div>
             </div>
             <div className="flex shrink-0 flex-col items-end gap-1">
-              <span className="text-navy font-semibold tabular-nums">{formatCurrency(t.netCost)}</span>
+              <span className="text-navy font-semibold tabular-nums">{money(t.netCost)}</span>
               <TreatmentRowActions id={t.id} name={t.name} patientName={t.patientName} status={t.status} canEdit={canEdit} canDelete={canDelete} />
             </div>
           </li>

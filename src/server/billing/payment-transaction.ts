@@ -46,12 +46,13 @@ export async function postInvoicePayment(data: PaymentInput & { requestId: strin
 
     await tx.invoice.update({ where: { id: data.invoiceId }, data: { status: newStatus } });
 
+    const currency=(await tx.clinicSettings.findFirst({select:{currency:true}}))?.currency??"USD";
     await tx.notification.create({
       data: {
         userId: invoice.createdById ?? user.id,
         type: "PAYMENT_RECEIVED",
         title: "Payment received",
-        message: `${formatCurrency(data.amount)} received from ${invoice.patient.fullName} for ${invoice.invoiceNumber}.`,
+        message: `${formatCurrency(data.amount,currency)} received from ${invoice.patient.fullName} for ${invoice.invoiceNumber}.`,
         link: `/billing/invoices/${invoice.id}`,
       },
     });
@@ -62,7 +63,7 @@ export async function postInvoicePayment(data: PaymentInput & { requestId: strin
         action: "PAYMENT",
         entityType: "Invoice",
         entityId: invoice.id,
-        description: `${user.name} recorded a ${formatCurrency(data.amount)} payment for ${invoice.invoiceNumber}.`,
+        description: `${user.name} recorded a ${formatCurrency(data.amount,currency)} payment for ${invoice.invoiceNumber}.`,
       },
     });
     return { invoice };

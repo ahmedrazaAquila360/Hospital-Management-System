@@ -7,7 +7,8 @@ import type { getRecentPayments } from "@/server/dashboard/queries";
 
 type Payment = Awaited<ReturnType<typeof getRecentPayments>>[number];
 
-export function RecentPaymentsPanel({ payments }: { payments: Payment[] }) {
+export function RecentPaymentsPanel({currency,  payments }: { currency:string; payments: Payment[] }) {
+  const money=(value:unknown)=>formatCurrency(value,currency);
   return (
     <PanelCard title="Recent Payments" viewAllHref="/billing/payments">
       {payments.length === 0 ? (
@@ -36,7 +37,7 @@ export function RecentPaymentsPanel({ payments }: { payments: Payment[] }) {
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-navy font-semibold tabular">{formatCurrency(p.amount)}</p>
+                  <p className="text-navy font-semibold tabular">{money(p.amount)}</p>
                   <p className="text-muted-foreground text-xs">{formatRelative(p.date)}</p>
                 </div>
               </Link>

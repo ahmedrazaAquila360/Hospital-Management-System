@@ -29,17 +29,18 @@ const TREATMENT_STATUS: Record<string, { label: string; className: string }> = {
 };
 
 /** Patient list: a table on wide containers, cards on narrow ones. */
-export function PatientsTable({
+export function PatientsTable({currency,
   rows,
   canManage,
   canDelete = false,
   filtered,
-}: {
+}: { currency:string;
   rows: PatientRow[];
   canManage: boolean;
   canDelete?: boolean;
   filtered: boolean;
 }) {
+  const money=(value:unknown)=>formatCurrency(value,currency);
   if (rows.length === 0) {
     return (
       <Empty className="w-auto border-border/70 mx-4 mb-5 rounded-2xl border border-dashed py-12 sm:mx-5">
@@ -103,7 +104,7 @@ export function PatientsTable({
                     p.outstandingBalance > 0 ? "text-destructive" : "text-muted-foreground"
                   )}
                 >
-                  {formatCurrency(p.outstandingBalance)}
+                  {money(p.outstandingBalance)}
                 </td>
                 <td className="py-3 pr-5 pl-3">{actions(p)}</td>
               </tr>
@@ -136,7 +137,7 @@ export function PatientsTable({
             </Link>
             <div className="flex shrink-0 flex-col items-end gap-1.5">
               <span className={cn("text-sm font-semibold tabular-nums", p.outstandingBalance > 0 ? "text-destructive" : "text-muted-foreground")}>
-                {formatCurrency(p.outstandingBalance)}
+                {money(p.outstandingBalance)}
               </span>
               {actions(p)}
             </div>

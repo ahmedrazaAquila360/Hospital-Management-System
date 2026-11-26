@@ -1,3 +1,4 @@
+import {getClinicSettings} from "@/server/settings/queries";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { CircleDollarSign, FileText, Plus, Receipt, Wallet } from "lucide-react";
@@ -25,12 +26,13 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Sea
   const params = await searchParams;
   const search = params.search?.trim() || undefined;
   // An unknown status would reach Prisma as an invalid enum and fail the page.
-  const status = Object.keys(INVOICE_STATUS_LABEL).find((s) => s === params.status) as InvoiceStatus | undefined;
+  const status = Object.keys(INVOICE_STATUS_LABEL).find((s) => s === params.status) as InvoiceStatus | "VOIDED" | undefined;
 
-  const [list, stats] = await Promise.all([
+  const [list, stats,clinic] = await Promise.all([
     listInvoices({ search, status, page: parsePage(params.page), pageSize: parsePageSize(params.perPage) }),
-    getInvoiceStats(),
+    getInvoiceStats(),getClinicSettings(),
   ]);
+  const money=(value:unknown)=>formatCurrency(value,clinic.currency);
   const rows = list.invoices.map((inv) => ({
     id: inv.id,
     invoiceNumber: inv.invoiceNumber,
@@ -65,14 +67,14 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Sea
 
       <div className="grid grid-cols-2 gap-2 sm:gap-4 xl:grid-cols-4">
         <StatCard icon={FileText} value={stats.count} label="Total Invoices" />
-        <StatCard icon={Receipt} value={formatCurrency(stats.totalBilled)} label="Total Billed" />
-        <StatCard icon={Wallet} value={formatCurrency(stats.totalPaid)} label="Total Paid" tone="success" />
-        <StatCard icon={CircleDollarSign} value={formatCurrency(stats.outstanding)} label="Outstanding" tone="destructive" />
+        <StatCard icon={Receipt} value={money(stats.totalBilled)} label="Total Billed" />
+        <StatCard icon={Wallet} value={money(stats.totalPaid)} label="Total Paid" tone="success" />
+        <StatCard icon={CircleDollarSign} value={money(stats.outstanding)} label="Outstanding" tone="destructive" />
       </div>
 
       <section className="surface-card @container overflow-hidden p-0">
         <InvoicesToolbar />
-        <InvoicesTable rows={rows} filtered={Boolean(search || status)} />
+        <InvoicesTable currency={clinic.currency} rows={rows} filtered={Boolean(search || status)} />
         {rows.length > 0 && (
           <ListFooter page={list.page} pageSize={list.pageSize} total={list.total} shown={rows.length} noun="invoice" />
         )}

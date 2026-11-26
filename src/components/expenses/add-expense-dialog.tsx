@@ -20,7 +20,7 @@ import { EXPENSE_CATEGORY_LABEL } from "@/lib/labels";
  * The action is called directly in a transition, so a server error keeps the dialog open with
  * everything typed, and success closes it, toasts and refreshes the list.
  */
-export function AddExpenseDialog() {
+export function AddExpenseDialog({currency}:{currency:string}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [category, setCategory] = useState<string>("OTHER");
@@ -119,7 +119,7 @@ export function AddExpenseDialog() {
             </Field>
             <Field className="sm:col-span-2">
               <FieldLabel htmlFor="exp-amount">
-                Amount ($) <RequiredMark />
+                Amount ({currency}) <RequiredMark />
               </FieldLabel>
               <IconInput
                 icon={<DollarSign />}

@@ -1,3 +1,4 @@
+import {getClinicSettings} from "@/server/settings/queries";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import Link from "next/link";
@@ -33,7 +34,8 @@ export const metadata: Metadata = { title: "Invoice Details" };
 export default async function InvoiceDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await requirePermission("billing.view");
   const { id } = await params;
-  const invoice = await getInvoiceById(id);
+  const [invoice,clinic] = await Promise.all([getInvoiceById(id),getClinicSettings()]);
+  const money=(value:unknown)=>formatCurrency(value,clinic.currency);
   if (!invoice) notFound();
 
   const total = toNumber(invoice.total);
@@ -100,6 +102,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
           </Button>
           {canManage && (
             <RecordPaymentDialog
+              currency={clinic.currency}
               invoiceId={invoice.id}
               invoiceNumber={invoice.invoiceNumber}
               total={total}
@@ -159,8 +162,8 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
                         )}
                       </td>
                       <td className="text-foreground/80 px-3 py-3.5 text-center tabular-nums">{item.quantity}</td>
-                      <td className="text-foreground/80 px-3 py-3.5 text-right tabular-nums">{formatCurrency(item.unitPrice)}</td>
-                      <td className="text-navy py-3.5 pr-6 pl-3 text-right font-semibold tabular-nums">{formatCurrency(item.amount)}</td>
+                      <td className="text-foreground/80 px-3 py-3.5 text-right tabular-nums">{money(item.unitPrice)}</td>
+                      <td className="text-navy py-3.5 pr-6 pl-3 text-right font-semibold tabular-nums">{money(item.amount)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -175,10 +178,10 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
                       {item.description}
                     </p>
                     <p className="text-muted-foreground text-xs tabular-nums">
-                      {item.quantity} × {formatCurrency(item.unitPrice)}
+                      {item.quantity} × {money(item.unitPrice)}
                     </p>
                   </div>
-                  <span className="text-navy font-semibold tabular-nums">{formatCurrency(item.amount)}</span>
+                  <span className="text-navy font-semibold tabular-nums">{money(item.amount)}</span>
                 </li>
               ))}
             </ul>
@@ -209,17 +212,17 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
         <aside className="surface-card p-5 sm:p-6 xl:sticky xl:top-24">
           <CardTitle icon={ReceiptText} title="Invoice Summary" />
           <dl className="mt-4 text-sm">
-            <SummaryRow label="Subtotal" value={formatCurrency(invoice.subtotal)} />
-            <SummaryRow label="Discount" value={`-${formatCurrency(invoice.discount)}`} />
-            <SummaryRow label="Tax" value={`+${formatCurrency(invoice.tax)}`} />
+            <SummaryRow label="Subtotal" value={money(invoice.subtotal)} />
+            <SummaryRow label="Discount" value={`-${money(invoice.discount)}`} />
+            <SummaryRow label="Tax" value={`+${money(invoice.tax)}`} />
           </dl>
           <div className="bg-pale mt-3 flex items-center justify-between rounded-2xl px-4 py-3.5">
             <span className="text-navy text-lg font-semibold">Total</span>
-            <span className="font-heading text-navy text-2xl font-semibold tabular-nums">{formatCurrency(total)}</span>
+            <span className="font-heading text-navy text-2xl font-semibold tabular-nums">{money(total)}</span>
           </div>
           <div className="mt-2.5 flex items-center justify-between rounded-xl bg-emerald-50 px-4 py-3 font-semibold text-emerald-700">
             <span>Paid</span>
-            <span className="tabular-nums">{formatCurrency(paid)}</span>
+            <span className="tabular-nums">{money(paid)}</span>
           </div>
           <div
             className={cn(
@@ -228,7 +231,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
             )}
           >
             <span>Remaining</span>
-            <span className="tabular-nums">{formatCurrency(remaining)}</span>
+            <span className="tabular-nums">{money(remaining)}</span>
           </div>
           <div className="mt-4">
             <div className="text-muted-foreground mb-1.5 flex justify-between text-xs">

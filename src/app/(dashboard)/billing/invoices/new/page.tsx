@@ -1,3 +1,4 @@
+import {getClinicSettings} from "@/server/settings/queries";
 import type { Metadata } from "next";
 import { requirePermission } from "@/lib/auth/guard";
 import { patientScope } from "@/server/patients/access";
@@ -17,10 +18,10 @@ export default async function NewInvoicePage({ searchParams }: { searchParams: S
   const actor = await requirePermission("billing.create");
   const params = await searchParams;
 
-  const [dentists, treatment, services] = await Promise.all([
+  const [dentists, treatment, services,clinic] = await Promise.all([
     getDentists(),
     params.treatmentId ? prisma.treatment.findUnique({ where: { id: params.treatmentId } }) : null,
-    prisma.service.findMany({ where: { active: true, department: { active: true } }, select: { name: true, price: true } }),
+    prisma.service.findMany({ where: { active: true, department: { active: true } }, select: { name: true, price: true } }),getClinicSettings(),
   ]);
 
   const patientId = params.patientId ?? treatment?.patientId;
@@ -42,6 +43,7 @@ export default async function NewInvoicePage({ searchParams }: { searchParams: S
         <ToothOutline className="absolute -top-3 right-4 hidden md:block" />
       </div>
       <InvoiceForm
+        currency={clinic.currency}
         action={createInvoiceAction}
         dentists={dentists.map((d) => ({ id: d.id, name: d.name }))}
         defaultPatient={defaultPatient}

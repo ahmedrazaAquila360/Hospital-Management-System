@@ -1,3 +1,4 @@
+import {getClinicSettings} from "@/server/settings/queries";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { requirePermission } from "@/lib/auth/guard";
@@ -14,6 +15,7 @@ const SECTIONS = ["chart", "procedures", "notes", "history"] as const;
 
 export default async function DentalChartPage({ searchParams }: { searchParams: SearchParams }) {
   const user = await requirePermission("dental_chart.view");
+  const currency=(await getClinicSettings()).currency;
   const { patientId, view, tab, ...pickerParams } = await searchParams;
 
   if (!patientId) {
@@ -28,6 +30,7 @@ export default async function DentalChartPage({ searchParams }: { searchParams: 
     <div className="flex flex-col gap-4">
       {/* Keyed by patient so switching patients never carries a selection or preview across. */}
       <DentalChartViews
+        currency={currency}
         key={patient.id}
         patient={patient}
         treatments={treatments}
